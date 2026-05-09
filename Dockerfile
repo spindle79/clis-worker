@@ -64,17 +64,17 @@ COPY --from=go-builder /out/ga4-pp-cli /usr/local/bin/ga4-pp-cli
 COPY --from=go-builder /out/ga4-pp-mcp /usr/local/bin/ga4-pp-mcp
 
 # Stage upstream SKILL.md for each CLI, plus worker-local addenda for any
-# bug-workarounds / context not yet upstream. Compose into /data/docs/<cli>.md.
-COPY --from=go-builder /out/docs /data/docs/
-COPY docs/README.md /data/docs/README.md
+# bug-workarounds / context not yet upstream. Compose into /app/docs/<cli>.md.
+COPY --from=go-builder /out/docs /app/docs/
+COPY docs/README.md /app/docs/README.md
 COPY docs/addenda /tmp/docs-addenda
 RUN if [ -d /tmp/docs-addenda ]; then \
       for f in /tmp/docs-addenda/*.md; do \
         [ -f "$f" ] || continue; \
         name=$(basename "$f"); \
-        if [ -f "/data/docs/$name" ]; then \
-          printf '\n\n---\n\n## Worker addendum\n\n_Workarounds and local-only context not yet upstream in this CLI._\n\n' >> "/data/docs/$name"; \
-          cat "$f" >> "/data/docs/$name"; \
+        if [ -f "/app/docs/$name" ]; then \
+          printf '\n\n---\n\n## Worker addendum\n\n_Workarounds and local-only context not yet upstream in this CLI._\n\n' >> "/app/docs/$name"; \
+          cat "$f" >> "/app/docs/$name"; \
         fi; \
       done; \
       rm -rf /tmp/docs-addenda; \

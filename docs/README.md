@@ -2,7 +2,7 @@
 
 Each CLI on `PATH` has a reference doc in this directory. **Before invoking
 commands from a CLI you don't already have docs loaded for in this turn,
-run `cat /data/docs/<name>.md`** to load its reference into context.
+run `cat /app/docs/<name>.md`** to load its reference into context.
 
 Always pass `--agent` to commands for compact JSON output suited for tool
 consumption (it expands to `--json --compact --unwrap --no-input --no-color

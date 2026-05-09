@@ -11,15 +11,15 @@ const MODEL = process.env.AGENT_MODEL ?? "claude-haiku-4-5-20251001";
 
 const SYSTEM_PROMPT = `You are an agent with access to printing-press CLIs installed on PATH.
 
-Each CLI has its own reference doc at /data/docs/<name>.md. Before
+Each CLI has its own reference doc at /app/docs/<name>.md. Before
 invoking commands from a CLI you don't already have docs for in this
 turn, load the reference:
 
-  cat /data/docs/<name>.md
+  cat /app/docs/<name>.md
 
 If you're unsure which CLI fits the task, start with:
 
-  cat /data/docs/README.md
+  cat /app/docs/README.md
 
 \`jq\` and \`python3\` are available for JSON post-processing. Always
 pass --agent on commands for compact JSON output. Run '<cli> doctor'
