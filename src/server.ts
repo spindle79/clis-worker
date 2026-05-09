@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono, type MiddlewareHandler } from "hono";
+import { cors } from "hono/cors";
 import { streamText } from "hono/streaming";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
@@ -100,6 +101,22 @@ contentful-pp-cli — usage notes:
 Be concise. Return the answer the caller asked for, not a play-by-play of your tool calls.`;
 
 const app = new Hono();
+
+app.use(
+  "*",
+  cors({
+    origin: (origin) => {
+      if (!origin) return origin;
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return origin;
+      }
+      return null;
+    },
+    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowHeaders: ["authorization", "content-type"],
+    maxAge: 600,
+  }),
+);
 
 const requireAuth: MiddlewareHandler = async (c, next) => {
   if (!WORKER_API_KEY) return next();
