@@ -33,6 +33,28 @@ Available CLIs:
                             (CDA), CONTENTFUL_PREVIEW_TOKEN (CPA); CONTENTFUL_SPACE_ID +
                             CONTENTFUL_ENVIRONMENT_ID set defaults but most commands also
                             take them as positional args.
+  ga4-pp-cli              — Google Analytics 4 Data API + Admin API (read).
+                            Property discovery (run this first if GA_PROPERTY_ID is unset
+                            or you need to choose between properties):
+                              accounts summaries --ids-only --agent     (flat property list)
+                              accounts list                              (account list only)
+                              properties describe <id>                   (single property metadata)
+                            The 7 Data API endpoints (runReport, runRealtimeReport,
+                            runPivotReport, batchRunReports, batchRunPivotReports,
+                            checkCompatibility, getMetadata) live under \`properties\`.
+                            Plus URL-centric and compound workflows:
+                              pages views|engagement|sources|conversions|analytics <pagePath>
+                              reports funnel --steps a,b,c
+                              schema fetch / list / search "<query>"   (offline cache)
+                              templates save|list|run|compat|delete   (named report bodies)
+                              drift pages --window 7d --top 20         (period-over-period)
+                              watch realtime --interval 30s --top 10   (streaming JSON)
+                            Auth via GOOGLE_APPLICATION_CREDENTIALS (path to service-account
+                            JSON). GA_PROPERTY_ID is optional — when unset, every command
+                            takes --property <id>. The service account can query any GA4
+                            property it has Viewer access on; use 'accounts summaries' to
+                            enumerate them. Every report response includes \`_warnings\` for
+                            sampling, (other)-bucket overflow, and quota exhaustion.
 
 Tooling guidance:
   - Always pass --agent for non-interactive JSON output.
@@ -40,7 +62,11 @@ Tooling guidance:
   - The local SQLite store is at $PRESS_DATA_DIR. Use 'sync' to populate, 'search'/'sql'
     to query without hitting the API.
   - Prefer compound commands (creator find, trends triangulate, contentful-pp-cli orphans,
-    contentful-pp-cli diff) over chaining raw endpoints.
+    contentful-pp-cli diff, ga4-pp-cli pages analytics, ga4-pp-cli drift pages) over
+    chaining raw endpoints.
+  - For ga4-pp-cli: run 'ga4-pp-cli schema fetch' once per property before searching, then
+    'schema search "<term>"' is offline. Save frequent reports with 'templates save <name>'
+    and re-run with 'templates run <name>' instead of re-typing flags.
 
 slack-pp-cli — known issue with POST endpoints (post_message, schedule_message,
 update_message, delete_message, etc.):
@@ -96,6 +122,8 @@ app.get("/health", (c) =>
     hasSlackKey: Boolean(process.env.SLACK_BOT_TOKEN),
     hasContentfulKey: Boolean(process.env.CONTENTFUL_MANAGEMENT_TOKEN),
     hasContentfulSpace: Boolean(process.env.CONTENTFUL_SPACE_ID),
+    hasGa4Credentials: Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS),
+    hasGa4PropertyId: Boolean(process.env.GA_PROPERTY_ID),
   }),
 );
 

@@ -26,6 +26,14 @@ services:
         sync: false
       - key: CONTENTFUL_ENVIRONMENT_ID
         value: master
+      # GA4 service-account auth. The JSON itself is mounted via a Render
+      # Secret File (dashboard → Environment → Secret Files); this var just
+      # tells ADC where to find it. GA_PROPERTY_ID is the default property
+      # numeric ID; ga4-pp-cli falls back to per-call --property if unset.
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/secrets/ga4-sa.json
+      - key: GA_PROPERTY_ID
+        sync: false
       - key: WORKER_API_KEY
         generateValue: true
       - key: NODE_ENV

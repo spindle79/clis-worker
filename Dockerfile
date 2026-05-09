@@ -23,6 +23,15 @@ WORKDIR /build/contentful-pp-cli
 RUN go build -ldflags="-s -w" -o /out/contentful-pp-cli ./cmd/contentful-pp-cli \
  && go build -ldflags="-s -w" -o /out/contentful-pp-mcp ./cmd/contentful-pp-mcp
 
+# ga4-pp-cli — Google Analytics Data API v1beta CLI. Same standalone-repo pattern
+# as contentful-pp-cli; push the local clis/ga4-pp-cli/ tree to spindle79/ga4-pp-cli
+# before this build runs.
+WORKDIR /build
+RUN git clone --depth=1 https://github.com/spindle79/ga4-pp-cli.git
+WORKDIR /build/ga4-pp-cli
+RUN go build -ldflags="-s -w" -o /out/ga4-pp-cli ./cmd/ga4-pp-cli \
+ && go build -ldflags="-s -w" -o /out/ga4-pp-mcp ./cmd/ga4-pp-mcp
+
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -43,6 +52,8 @@ COPY --from=go-builder /out/slack-pp-cli /usr/local/bin/slack-pp-cli
 COPY --from=go-builder /out/slack-pp-mcp /usr/local/bin/slack-pp-mcp
 COPY --from=go-builder /out/contentful-pp-cli /usr/local/bin/contentful-pp-cli
 COPY --from=go-builder /out/contentful-pp-mcp /usr/local/bin/contentful-pp-mcp
+COPY --from=go-builder /out/ga4-pp-cli /usr/local/bin/ga4-pp-cli
+COPY --from=go-builder /out/ga4-pp-mcp /usr/local/bin/ga4-pp-mcp
 
 # Don't reuse the host-generated lockfile here — its optional-dep selections are
 # platform-specific (the Agent SDK ships native binaries per platform/libc).
