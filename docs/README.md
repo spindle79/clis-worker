@@ -23,8 +23,8 @@ not here, when adding or renaming a CLI in the worker.
 docs/
 ├── README.md           ← this file (human reference; not in the image)
 └── addenda/
-    ├── slack.md        ← appended to /app/docs/slack.md at build time
-    └── contentful.md   ← appended to /app/docs/contentful.md at build time
+    ├── slack-pp-cli.md      ← appended to /app/docs/slack-pp-cli.md at build time
+    └── contentful-pp-cli.md ← appended to /app/docs/contentful-pp-cli.md at build time
 ```
 
 ## Adding a recipe

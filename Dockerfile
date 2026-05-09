@@ -18,12 +18,12 @@ RUN chmod +x /usr/local/bin/extract-recipes.sh && mkdir -p /out/docs
 WORKDIR /build/printing-press-library/library/developer-tools/scrape-creators
 RUN go build -ldflags="-s -w" -o /out/scrape-creators-pp-cli ./cmd/scrape-creators-pp-cli \
  && go build -ldflags="-s -w" -o /out/scrape-creators-pp-mcp ./cmd/scrape-creators-pp-mcp \
- && extract-recipes.sh SKILL.md scrape-creators-pp-cli > /out/docs/scrape-creators.md
+ && extract-recipes.sh SKILL.md scrape-creators-pp-cli > /out/docs/scrape-creators-pp-cli.md
 
 WORKDIR /build/printing-press-library/library/productivity/slack
 RUN go build -ldflags="-s -w" -o /out/slack-pp-cli ./cmd/slack-pp-cli \
  && go build -ldflags="-s -w" -o /out/slack-pp-mcp ./cmd/slack-pp-mcp \
- && extract-recipes.sh SKILL.md slack-pp-cli > /out/docs/slack.md
+ && extract-recipes.sh SKILL.md slack-pp-cli > /out/docs/slack-pp-cli.md
 
 # contentful-pp-cli ships as a standalone repo (not part of the printing-press-library
 # monorepo), so it gets its own clone + build pair.
@@ -32,7 +32,7 @@ RUN git clone --depth=1 https://github.com/spindle79/contentful-pp-cli.git
 WORKDIR /build/contentful-pp-cli
 RUN go build -ldflags="-s -w" -o /out/contentful-pp-cli ./cmd/contentful-pp-cli \
  && go build -ldflags="-s -w" -o /out/contentful-pp-mcp ./cmd/contentful-pp-mcp \
- && extract-recipes.sh SKILL.md contentful-pp-cli > /out/docs/contentful.md
+ && extract-recipes.sh SKILL.md contentful-pp-cli > /out/docs/contentful-pp-cli.md
 
 # ga4-pp-cli — Google Analytics Data API v1beta CLI. Same standalone-repo pattern
 # as contentful-pp-cli; push the local clis/ga4-pp-cli/ tree to spindle79/ga4-pp-cli
@@ -42,7 +42,7 @@ RUN git clone --depth=1 https://github.com/spindle79/ga4-pp-cli.git
 WORKDIR /build/ga4-pp-cli
 RUN go build -ldflags="-s -w" -o /out/ga4-pp-cli ./cmd/ga4-pp-cli \
  && go build -ldflags="-s -w" -o /out/ga4-pp-mcp ./cmd/ga4-pp-mcp \
- && extract-recipes.sh SKILL.md ga4-pp-cli > /out/docs/ga4.md
+ && extract-recipes.sh SKILL.md ga4-pp-cli > /out/docs/ga4-pp-cli.md
 
 FROM golang:1.26-bookworm AS sf-builder
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
