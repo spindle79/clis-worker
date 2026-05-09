@@ -12,6 +12,8 @@ services:
         sync: false
       - key: SCRAPE_CREATORS_API_KEY_AUTH
         sync: false
+      - key: SLACK_BOT_TOKEN
+        sync: false
       - key: WORKER_API_KEY
         generateValue: true
       - key: NODE_ENV

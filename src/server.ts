@@ -15,6 +15,8 @@ Available CLIs:
                             YouTube, X, LinkedIn, Reddit, Threads, Bluesky, Pinterest, etc.)
                             plus compound commands: creator find, trends triangulate,
                             transcripts search, content spikes, ads monitor, bio resolve.
+  slack-pp-cli            — 66 Slack endpoints — send messages, search conversations,
+                            monitor channels, manage workspace. Auth via SLACK_BOT_TOKEN.
 
 Tooling guidance:
   - Always pass --agent for non-interactive JSON output.

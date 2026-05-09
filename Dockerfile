@@ -5,10 +5,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 RUN git clone --depth=1 https://github.com/mvanhorn/printing-press-library.git
-WORKDIR /build/printing-press-library/library/developer-tools/scrape-creators
 ENV CGO_ENABLED=0 GOFLAGS="-trimpath"
+
+WORKDIR /build/printing-press-library/library/developer-tools/scrape-creators
 RUN go build -ldflags="-s -w" -o /out/scrape-creators-pp-cli ./cmd/scrape-creators-pp-cli \
  && go build -ldflags="-s -w" -o /out/scrape-creators-pp-mcp ./cmd/scrape-creators-pp-mcp
+
+WORKDIR /build/printing-press-library/library/productivity/slack
+RUN go build -ldflags="-s -w" -o /out/slack-pp-cli ./cmd/slack-pp-cli \
+ && go build -ldflags="-s -w" -o /out/slack-pp-mcp ./cmd/slack-pp-mcp
 
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
@@ -26,6 +31,8 @@ WORKDIR /app
 
 COPY --from=go-builder /out/scrape-creators-pp-cli /usr/local/bin/scrape-creators-pp-cli
 COPY --from=go-builder /out/scrape-creators-pp-mcp /usr/local/bin/scrape-creators-pp-mcp
+COPY --from=go-builder /out/slack-pp-cli /usr/local/bin/slack-pp-cli
+COPY --from=go-builder /out/slack-pp-mcp /usr/local/bin/slack-pp-mcp
 
 # Don't reuse the host-generated lockfile here — its optional-dep selections are
 # platform-specific (the Agent SDK ships native binaries per platform/libc).
