@@ -20,10 +20,25 @@ Available CLIs:
 
 Tooling guidance:
   - Always pass --agent for non-interactive JSON output.
-  - Use 'scrape-creators-pp-cli doctor' first if you suspect auth or store issues.
+  - Run '<cli> doctor' first if you suspect auth, scope, or store issues.
   - The local SQLite store is at $PRESS_DATA_DIR. Use 'sync' to populate, 'search'/'sql'
     to query without hitting the API.
   - Prefer compound commands (creator find, trends triangulate) over chaining raw endpoints.
+
+slack-pp-cli — known issue with POST endpoints (post_message, schedule_message,
+update_message, delete_message, etc.):
+
+  The flag values for --channel/--text/--thread-ts are NOT serialized into the
+  HTTP request body — Slack rejects with "missing required field: channel".
+  Workaround: use --stdin with the JSON body. The required flags must still be
+  passed (with dummy values) to satisfy CLI validation:
+
+    echo '{"channel":"<id-or-name>","text":"<message>"}' \\
+      | slack-pp-cli messages post_message --channel x --text x --stdin --agent
+
+  Replace <id-or-name> with a real channel name (e.g. general) or ID (e.g. C0123).
+  The bot must be a member of the channel, or the call returns "not_in_channel".
+  GET endpoints in slack-pp-cli (search, list, doctor, sync, etc.) work normally.
 
 Be concise. Return the answer the caller asked for, not a play-by-play of your tool calls.`;
 
