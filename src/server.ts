@@ -6,6 +6,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 const PORT = Number(process.env.PORT ?? 3000);
 const DATA_DIR = process.env.PRESS_DATA_DIR ?? "/data";
 const WORKER_API_KEY = process.env.WORKER_API_KEY;
+const MODEL = process.env.AGENT_MODEL ?? "claude-haiku-4-5-20251001";
 
 const SYSTEM_PROMPT = `You are an agent with access to printing-press CLI tools installed on PATH.
 
@@ -40,6 +41,7 @@ app.get("/", (c) => c.text("clis-worker ready"));
 app.get("/health", (c) =>
   c.json({
     ok: true,
+    model: MODEL,
     dataDir: DATA_DIR,
     hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
     hasScrapeCreatorsKey: Boolean(process.env.SCRAPE_CREATORS_API_KEY_AUTH),
@@ -58,6 +60,7 @@ app.post("/agent", requireAuth, async (c) => {
         cwd: DATA_DIR,
         allowedTools: ["Bash"],
         systemPrompt: SYSTEM_PROMPT,
+        model: MODEL,
       },
     });
 
