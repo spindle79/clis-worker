@@ -27,9 +27,12 @@ WORKDIR /app
 COPY --from=go-builder /out/scrape-creators-pp-cli /usr/local/bin/scrape-creators-pp-cli
 COPY --from=go-builder /out/scrape-creators-pp-mcp /usr/local/bin/scrape-creators-pp-mcp
 
-COPY package.json package-lock.json* ./
+# Don't reuse the host-generated lockfile here — its optional-dep selections are
+# platform-specific (the Agent SDK ships native binaries per platform/libc).
+# Letting npm re-resolve in the container guarantees the correct linux variant.
+COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --omit=dev
+    npm install --omit=dev --no-package-lock
 
 COPY --from=node-builder /app/dist ./dist
 
