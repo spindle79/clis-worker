@@ -10,7 +10,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "review": "tsx scripts/review.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138",
