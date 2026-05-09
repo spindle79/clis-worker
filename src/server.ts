@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { streamText } from "hono/streaming";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
@@ -26,14 +26,14 @@ Be concise. Return the answer the caller asked for, not a play-by-play of your t
 
 const app = new Hono();
 
-app.use("*", async (c, next) => {
+const requireAuth: MiddlewareHandler = async (c, next) => {
   if (!WORKER_API_KEY) return next();
   const auth = c.req.header("authorization");
   if (auth !== `Bearer ${WORKER_API_KEY}`) {
     return c.json({ error: "unauthorized" }, 401);
   }
   return next();
-});
+};
 
 app.get("/", (c) => c.text("clis-worker ready"));
 
@@ -46,7 +46,7 @@ app.get("/health", (c) =>
   }),
 );
 
-app.post("/agent", async (c) => {
+app.post("/agent", requireAuth, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { prompt?: string };
   const prompt = body.prompt;
   if (!prompt) return c.json({ error: "prompt required" }, 400);
