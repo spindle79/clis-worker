@@ -4,16 +4,22 @@ FROM golang:1.26-bookworm AS go-builder
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
-RUN git clone --depth=1 https://github.com/mvanhorn/printing-press-library.git
+# Pinned to spindle79's fork so worker-relevant doc edits and patches can ship
+# from the same org. Sync upstream from mvanhorn/printing-press-library as needed.
+RUN git clone --depth=1 https://github.com/spindle79/printing-press-library.git
 ENV CGO_ENABLED=0 GOFLAGS="-trimpath"
+
+RUN mkdir -p /out/docs
 
 WORKDIR /build/printing-press-library/library/developer-tools/scrape-creators
 RUN go build -ldflags="-s -w" -o /out/scrape-creators-pp-cli ./cmd/scrape-creators-pp-cli \
- && go build -ldflags="-s -w" -o /out/scrape-creators-pp-mcp ./cmd/scrape-creators-pp-mcp
+ && go build -ldflags="-s -w" -o /out/scrape-creators-pp-mcp ./cmd/scrape-creators-pp-mcp \
+ && cp SKILL.md /out/docs/scrape-creators.md
 
 WORKDIR /build/printing-press-library/library/productivity/slack
 RUN go build -ldflags="-s -w" -o /out/slack-pp-cli ./cmd/slack-pp-cli \
- && go build -ldflags="-s -w" -o /out/slack-pp-mcp ./cmd/slack-pp-mcp
+ && go build -ldflags="-s -w" -o /out/slack-pp-mcp ./cmd/slack-pp-mcp \
+ && cp SKILL.md /out/docs/slack.md
 
 # contentful-pp-cli ships as a standalone repo (not part of the printing-press-library
 # monorepo), so it gets its own clone + build pair.
@@ -21,7 +27,8 @@ WORKDIR /build
 RUN git clone --depth=1 https://github.com/spindle79/contentful-pp-cli.git
 WORKDIR /build/contentful-pp-cli
 RUN go build -ldflags="-s -w" -o /out/contentful-pp-cli ./cmd/contentful-pp-cli \
- && go build -ldflags="-s -w" -o /out/contentful-pp-mcp ./cmd/contentful-pp-mcp
+ && go build -ldflags="-s -w" -o /out/contentful-pp-mcp ./cmd/contentful-pp-mcp \
+ && cp SKILL.md /out/docs/contentful.md
 
 # ga4-pp-cli — Google Analytics Data API v1beta CLI. Same standalone-repo pattern
 # as contentful-pp-cli; push the local clis/ga4-pp-cli/ tree to spindle79/ga4-pp-cli
@@ -30,7 +37,8 @@ WORKDIR /build
 RUN git clone --depth=1 https://github.com/spindle79/ga4-pp-cli.git
 WORKDIR /build/ga4-pp-cli
 RUN go build -ldflags="-s -w" -o /out/ga4-pp-cli ./cmd/ga4-pp-cli \
- && go build -ldflags="-s -w" -o /out/ga4-pp-mcp ./cmd/ga4-pp-mcp
+ && go build -ldflags="-s -w" -o /out/ga4-pp-mcp ./cmd/ga4-pp-mcp \
+ && cp SKILL.md /out/docs/ga4.md
 
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
@@ -54,6 +62,23 @@ COPY --from=go-builder /out/contentful-pp-cli /usr/local/bin/contentful-pp-cli
 COPY --from=go-builder /out/contentful-pp-mcp /usr/local/bin/contentful-pp-mcp
 COPY --from=go-builder /out/ga4-pp-cli /usr/local/bin/ga4-pp-cli
 COPY --from=go-builder /out/ga4-pp-mcp /usr/local/bin/ga4-pp-mcp
+
+# Stage upstream SKILL.md for each CLI, plus worker-local addenda for any
+# bug-workarounds / context not yet upstream. Compose into /data/docs/<cli>.md.
+COPY --from=go-builder /out/docs /data/docs/
+COPY docs/README.md /data/docs/README.md
+COPY docs/addenda /tmp/docs-addenda
+RUN if [ -d /tmp/docs-addenda ]; then \
+      for f in /tmp/docs-addenda/*.md; do \
+        [ -f "$f" ] || continue; \
+        name=$(basename "$f"); \
+        if [ -f "/data/docs/$name" ]; then \
+          printf '\n\n---\n\n## Worker addendum\n\n_Workarounds and local-only context not yet upstream in this CLI._\n\n' >> "/data/docs/$name"; \
+          cat "$f" >> "/data/docs/$name"; \
+        fi; \
+      done; \
+      rm -rf /tmp/docs-addenda; \
+    fi
 
 # Don't reuse the host-generated lockfile here — its optional-dep selections are
 # platform-specific (the Agent SDK ships native binaries per platform/libc).
