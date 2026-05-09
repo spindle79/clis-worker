@@ -86,17 +86,36 @@ update_message, delete_message, etc.):
 
 contentful-pp-cli — usage notes:
 
-  - Most CMA / CDA / CPA commands take <space_id> <environment_id> as positional
-    args even when env vars are set. Pass them explicitly:
-      contentful-pp-cli entries list "$CONTENTFUL_SPACE_ID" master --json --agent
-  - Bulk operations default to dry-run preview. Pass --confirm to execute against
-    the API; the adaptive limiter starts at 5 rps (override with --rate-limit-rps).
+  - **ALWAYS pass --agent for list/get commands.** It expands to
+    --json --compact --unwrap --no-input --no-color --yes, which strips both
+    the {meta, results} provenance envelope AND Contentful's list-response
+    wrapper ({sys: {type: "Array"}, total, skip, limit, items: [...]}). Result:
+    a flat [...] array of compact items (or a bare object for get commands).
+    A 5-row content-types listing is ~33 KB without --agent and ~600 B with it
+    — skipping --agent burns input tokens and forces extra parsing turns.
+  - Most CMA / CDA / CPA commands take <space_id> <environment_id> as
+    positional args even when env vars are set. Pass them explicitly:
+      contentful-pp-cli entries list "$CONTENTFUL_SPACE_ID" master --agent --select sys.id,sys.contentType.sys.id,fields.title --limit 10
+  - With --agent the response is already a flat array. **Do NOT** pipe through
+    'jq .results.items' or 'jq .items' — those return null. Iterate directly:
+      ... --agent | jq '.[].sys.id'      # correct
+      ... --agent | jq '.results.items'  # WRONG — returns null
+  - --select takes dotted paths and projects across list items. Examples:
+      --select sys.id,name                            # content-types, locales, spaces, environments
+      --select sys.id,sys.contentType.sys.id          # entries (id + content-type)
+      --select sys.id,fields.title,fields.file.url    # assets
+    Without --select, --compact (auto-on under --agent) lifts sys.id, sys.type,
+    and sys.contentType.sys.id to top-level keys (id, type, contentType) plus a
+    high-gravity allowlist (name, displayField, code, default, status, …).
+  - Bulk operations default to dry-run preview. Pass --confirm to execute
+    against the API; the adaptive limiter starts at 5 rps (override with
+    --rate-limit-rps).
   - Transcendence commands (orphans, refs, refs-broken, diff, field-usage,
     validate-content, gql-impact, images url) require a sync first — run
     'contentful-pp-cli sync --full' to populate the local mirror, then query.
-  - 'migrate run' shells out to 'npx contentful-migration' which is NOT installed
-    in this image. Use 'migrate-gen' to emit the script; execute it on a host that
-    has Node + npx available.
+  - 'migrate run' shells out to 'npx contentful-migration' which is NOT
+    installed in this image. Use 'migrate-gen' to emit the script; execute it
+    on a host that has Node + npx available.
 
 Be concise. Return the answer the caller asked for, not a play-by-play of your tool calls.`;
 
