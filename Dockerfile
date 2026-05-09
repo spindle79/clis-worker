@@ -15,6 +15,14 @@ WORKDIR /build/printing-press-library/library/productivity/slack
 RUN go build -ldflags="-s -w" -o /out/slack-pp-cli ./cmd/slack-pp-cli \
  && go build -ldflags="-s -w" -o /out/slack-pp-mcp ./cmd/slack-pp-mcp
 
+# contentful-pp-cli ships as a standalone repo (not part of the printing-press-library
+# monorepo), so it gets its own clone + build pair.
+WORKDIR /build
+RUN git clone --depth=1 https://github.com/spindle79/contentful-pp-cli.git
+WORKDIR /build/contentful-pp-cli
+RUN go build -ldflags="-s -w" -o /out/contentful-pp-cli ./cmd/contentful-pp-cli \
+ && go build -ldflags="-s -w" -o /out/contentful-pp-mcp ./cmd/contentful-pp-mcp
+
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -33,6 +41,8 @@ COPY --from=go-builder /out/scrape-creators-pp-cli /usr/local/bin/scrape-creator
 COPY --from=go-builder /out/scrape-creators-pp-mcp /usr/local/bin/scrape-creators-pp-mcp
 COPY --from=go-builder /out/slack-pp-cli /usr/local/bin/slack-pp-cli
 COPY --from=go-builder /out/slack-pp-mcp /usr/local/bin/slack-pp-mcp
+COPY --from=go-builder /out/contentful-pp-cli /usr/local/bin/contentful-pp-cli
+COPY --from=go-builder /out/contentful-pp-mcp /usr/local/bin/contentful-pp-mcp
 
 # Don't reuse the host-generated lockfile here — its optional-dep selections are
 # platform-specific (the Agent SDK ships native binaries per platform/libc).

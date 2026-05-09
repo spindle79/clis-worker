@@ -17,13 +17,30 @@ Available CLIs:
                             transcripts search, content spikes, ads monitor, bio resolve.
   slack-pp-cli            — 66 Slack endpoints — send messages, search conversations,
                             monitor channels, manage workspace. Auth via SLACK_BOT_TOKEN.
+  contentful-pp-cli       — 134 Contentful endpoints across CMA, CDA, CPA, GraphQL, and
+                            Images, plus 11 transcendence commands powered by a local
+                            SQLite mirror: orphans (find unreferenced entries/types/assets),
+                            refs / refs-broken (offline reference graph walker + dangling-link
+                            finder), diff (full environment diff incl. releases, scheduled
+                            actions, tags, tasks, roles), migrate-gen (emit a runnable
+                            contentful-migration JS from an env diff), field-usage (per-locale
+                            fill-rate stats), validate-content (run content-type validations
+                            offline), entries bulk-publish/bulk-unpublish/bulk-validate
+                            (SQL-driven, rate-aware against the 7 req/s CMA ceiling),
+                            gql-impact (find frontend code referencing a removed field),
+                            images url (build images.ctfassets.net URLs with --srcset).
+                            Auth: CONTENTFUL_MANAGEMENT_TOKEN (CMA), CONTENTFUL_DELIVERY_TOKEN
+                            (CDA), CONTENTFUL_PREVIEW_TOKEN (CPA); CONTENTFUL_SPACE_ID +
+                            CONTENTFUL_ENVIRONMENT_ID set defaults but most commands also
+                            take them as positional args.
 
 Tooling guidance:
   - Always pass --agent for non-interactive JSON output.
   - Run '<cli> doctor' first if you suspect auth, scope, or store issues.
   - The local SQLite store is at $PRESS_DATA_DIR. Use 'sync' to populate, 'search'/'sql'
     to query without hitting the API.
-  - Prefer compound commands (creator find, trends triangulate) over chaining raw endpoints.
+  - Prefer compound commands (creator find, trends triangulate, contentful-pp-cli orphans,
+    contentful-pp-cli diff) over chaining raw endpoints.
 
 slack-pp-cli — known issue with POST endpoints (post_message, schedule_message,
 update_message, delete_message, etc.):
@@ -39,6 +56,20 @@ update_message, delete_message, etc.):
   Replace <id-or-name> with a real channel name (e.g. general) or ID (e.g. C0123).
   The bot must be a member of the channel, or the call returns "not_in_channel".
   GET endpoints in slack-pp-cli (search, list, doctor, sync, etc.) work normally.
+
+contentful-pp-cli — usage notes:
+
+  - Most CMA / CDA / CPA commands take <space_id> <environment_id> as positional
+    args even when env vars are set. Pass them explicitly:
+      contentful-pp-cli entries list "$CONTENTFUL_SPACE_ID" master --json --agent
+  - Bulk operations default to dry-run preview. Pass --confirm to execute against
+    the API; the adaptive limiter starts at 5 rps (override with --rate-limit-rps).
+  - Transcendence commands (orphans, refs, refs-broken, diff, field-usage,
+    validate-content, gql-impact, images url) require a sync first — run
+    'contentful-pp-cli sync --full' to populate the local mirror, then query.
+  - 'migrate run' shells out to 'npx contentful-migration' which is NOT installed
+    in this image. Use 'migrate-gen' to emit the script; execute it on a host that
+    has Node + npx available.
 
 Be concise. Return the answer the caller asked for, not a play-by-play of your tool calls.`;
 
@@ -62,6 +93,9 @@ app.get("/health", (c) =>
     dataDir: DATA_DIR,
     hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
     hasScrapeCreatorsKey: Boolean(process.env.SCRAPE_CREATORS_API_KEY_AUTH),
+    hasSlackKey: Boolean(process.env.SLACK_BOT_TOKEN),
+    hasContentfulKey: Boolean(process.env.CONTENTFUL_MANAGEMENT_TOKEN),
+    hasContentfulSpace: Boolean(process.env.CONTENTFUL_SPACE_ID),
   }),
 );
 
