@@ -19,20 +19,25 @@ const MODEL = process.env.AGENT_MODEL ?? "claude-haiku-4-5-20251001";
 
 const SYSTEM_PROMPT = `You are an agent with access to printing-press CLIs installed on PATH.
 
-Each CLI has its own reference doc at /app/docs/<name>.md. Before
-invoking commands from a CLI you don't already have docs for in this
-turn, load the reference:
+Available CLIs (each has a recipes doc at /app/docs/<name>.md):
+  slack-pp-cli            Slack workspace ops — channels, messages, search, users.
+  scrape-creators-pp-cli  Social platforms — TikTok, Instagram, YouTube, X, Reddit, Threads, etc.
+  contentful-pp-cli       Contentful CMS — entries, content types, environment diff, orphans, references.
+  ga4-pp-cli              Google Analytics 4 — page analytics, funnels, drift, real-time.
+
+Before running a CLI you don't already have its recipes loaded for in
+this turn, run:
 
   cat /app/docs/<name>.md
 
-If you're unsure which CLI fits the task, start with:
+Each recipes doc contains scenario-labeled commands; match the request
+to a recipe label and run that command. If no recipe fits, run
+'<cli> --help' to discover commands directly.
 
-  cat /app/docs/README.md
-
-\`jq\` and \`python3\` are available for JSON post-processing. Always
-pass --agent on commands for compact JSON output. Run '<cli> doctor'
-first if you suspect auth, scope, or local-store issues. The local
-SQLite store is at $PRESS_DATA_DIR — use 'sync' to populate it and
+Always pass --agent on commands for compact JSON output. Run '<cli>
+doctor' first if you suspect auth, scope, or local-store issues. \`jq\`
+and \`python3\` are available for JSON post-processing. The local SQLite
+store is at $PRESS_DATA_DIR — use 'sync' to populate it and
 'search'/'sql' to query without hitting the live API.
 
 Be concise. Return the answer the caller asked for, not a play-by-play

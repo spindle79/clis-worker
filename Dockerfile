@@ -9,17 +9,21 @@ WORKDIR /build
 RUN git clone --depth=1 https://github.com/spindle79/printing-press-library.git
 ENV CGO_ENABLED=0 GOFLAGS="-trimpath"
 
-RUN mkdir -p /out/docs
+# Slim each SKILL.md to a recipes-only reference at build time (drops install /
+# MCP / "Direct Use" boilerplate the worker image doesn't need). Worker addenda
+# are appended afterward in the runtime stage.
+COPY scripts/extract-recipes.sh /usr/local/bin/extract-recipes.sh
+RUN chmod +x /usr/local/bin/extract-recipes.sh && mkdir -p /out/docs
 
 WORKDIR /build/printing-press-library/library/developer-tools/scrape-creators
 RUN go build -ldflags="-s -w" -o /out/scrape-creators-pp-cli ./cmd/scrape-creators-pp-cli \
  && go build -ldflags="-s -w" -o /out/scrape-creators-pp-mcp ./cmd/scrape-creators-pp-mcp \
- && cp SKILL.md /out/docs/scrape-creators.md
+ && extract-recipes.sh SKILL.md scrape-creators-pp-cli > /out/docs/scrape-creators.md
 
 WORKDIR /build/printing-press-library/library/productivity/slack
 RUN go build -ldflags="-s -w" -o /out/slack-pp-cli ./cmd/slack-pp-cli \
  && go build -ldflags="-s -w" -o /out/slack-pp-mcp ./cmd/slack-pp-mcp \
- && cp SKILL.md /out/docs/slack.md
+ && extract-recipes.sh SKILL.md slack-pp-cli > /out/docs/slack.md
 
 # contentful-pp-cli ships as a standalone repo (not part of the printing-press-library
 # monorepo), so it gets its own clone + build pair.
@@ -28,7 +32,7 @@ RUN git clone --depth=1 https://github.com/spindle79/contentful-pp-cli.git
 WORKDIR /build/contentful-pp-cli
 RUN go build -ldflags="-s -w" -o /out/contentful-pp-cli ./cmd/contentful-pp-cli \
  && go build -ldflags="-s -w" -o /out/contentful-pp-mcp ./cmd/contentful-pp-mcp \
- && cp SKILL.md /out/docs/contentful.md
+ && extract-recipes.sh SKILL.md contentful-pp-cli > /out/docs/contentful.md
 
 # ga4-pp-cli — Google Analytics Data API v1beta CLI. Same standalone-repo pattern
 # as contentful-pp-cli; push the local clis/ga4-pp-cli/ tree to spindle79/ga4-pp-cli
@@ -38,7 +42,7 @@ RUN git clone --depth=1 https://github.com/spindle79/ga4-pp-cli.git
 WORKDIR /build/ga4-pp-cli
 RUN go build -ldflags="-s -w" -o /out/ga4-pp-cli ./cmd/ga4-pp-cli \
  && go build -ldflags="-s -w" -o /out/ga4-pp-mcp ./cmd/ga4-pp-mcp \
- && cp SKILL.md /out/docs/ga4.md
+ && extract-recipes.sh SKILL.md ga4-pp-cli > /out/docs/ga4.md
 
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
@@ -63,10 +67,11 @@ COPY --from=go-builder /out/contentful-pp-mcp /usr/local/bin/contentful-pp-mcp
 COPY --from=go-builder /out/ga4-pp-cli /usr/local/bin/ga4-pp-cli
 COPY --from=go-builder /out/ga4-pp-mcp /usr/local/bin/ga4-pp-mcp
 
-# Stage upstream SKILL.md for each CLI, plus worker-local addenda for any
-# bug-workarounds / context not yet upstream. Compose into /app/docs/<cli>.md.
+# Stage the per-CLI recipes-only docs from go-builder, then append any
+# worker-local addenda (extra recipes, bug-workarounds) at /app/docs/<cli>.md.
+# The router that picks which doc to read lives in the worker's system prompt;
+# no /app/docs/README.md is needed at runtime.
 COPY --from=go-builder /out/docs /app/docs/
-COPY docs/README.md /app/docs/README.md
 COPY docs/addenda /tmp/docs-addenda
 RUN if [ -d /tmp/docs-addenda ]; then \
       for f in /tmp/docs-addenda/*.md; do \
