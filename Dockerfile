@@ -44,14 +44,14 @@ RUN go build -ldflags="-s -w" -o /out/ga4-pp-cli ./cmd/ga4-pp-cli \
  && go build -ldflags="-s -w" -o /out/ga4-pp-mcp ./cmd/ga4-pp-mcp \
  && extract-recipes.sh SKILL.md ga4-pp-cli > /out/docs/ga4-pp-cli.md
 
-FROM golang:1.26-bookworm AS sf-builder
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-COPY --from=sf-src . /src
-WORKDIR /src
-ENV CGO_ENABLED=0 GOFLAGS="-trimpath"
+# screaming-frog-pp-cli — Headless wrapper around Screaming Frog SEO Spider.
+# Same standalone-repo pattern as contentful / ga4.
+WORKDIR /build
+RUN git clone --depth=1 https://github.com/spindle79/screaming-frog-pp-cli.git
+WORKDIR /build/screaming-frog-pp-cli
 RUN go build -ldflags="-s -w" -o /out/screaming-frog-pp-cli ./cmd/screaming-frog-pp-cli \
- && go build -ldflags="-s -w" -o /out/screaming-frog-pp-mcp ./cmd/screaming-frog-pp-mcp
+ && go build -ldflags="-s -w" -o /out/screaming-frog-pp-mcp ./cmd/screaming-frog-pp-mcp \
+ && extract-recipes.sh SKILL.md screaming-frog-pp-cli > /out/docs/screaming-frog-pp-cli.md
 
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
@@ -75,8 +75,8 @@ COPY --from=go-builder /out/contentful-pp-cli /usr/local/bin/contentful-pp-cli
 COPY --from=go-builder /out/contentful-pp-mcp /usr/local/bin/contentful-pp-mcp
 COPY --from=go-builder /out/ga4-pp-cli /usr/local/bin/ga4-pp-cli
 COPY --from=go-builder /out/ga4-pp-mcp /usr/local/bin/ga4-pp-mcp
-COPY --from=sf-builder /out/screaming-frog-pp-cli /usr/local/bin/screaming-frog-pp-cli
-COPY --from=sf-builder /out/screaming-frog-pp-mcp /usr/local/bin/screaming-frog-pp-mcp
+COPY --from=go-builder /out/screaming-frog-pp-cli /usr/local/bin/screaming-frog-pp-cli
+COPY --from=go-builder /out/screaming-frog-pp-mcp /usr/local/bin/screaming-frog-pp-mcp
 
 # Stage the per-CLI recipes-only docs from go-builder, then append any
 # worker-local addenda (extra recipes, bug-workarounds) at /app/docs/<cli>.md.
