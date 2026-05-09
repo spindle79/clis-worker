@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: clis-worker
+    runtime: docker
+    region: oregon
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SCRAPE_CREATORS_API_KEY_AUTH
+        sync: false
+      - key: WORKER_API_KEY
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: PRESS_DATA_DIR
+        value: /data
+      - key: PORT
+        value: "3000"
+    disk:
+      name: press-data
+      mountPath: /data
+      sizeGB: 1
