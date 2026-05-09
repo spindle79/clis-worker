@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1.7
+ARG SCREAMING_FROG_VERSION=23.3.0
+ARG BASE_IMAGE=clis-worker:slim
+
+FROM ${BASE_IMAGE} AS base
+ARG SCREAMING_FROG_VERSION
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      openjdk-17-jre-headless \
+      wget ca-certificates \
+      xvfb libxext6 libxrender1 libxtst6 fontconfig \
+ && wget -qO /tmp/sf.deb "https://download.screamingfrog.co.uk/products/seo-spider/screamingfrogseospider_${SCREAMING_FROG_VERSION}_all.deb" \
+ && apt-get install -y /tmp/sf.deb \
+ && rm /tmp/sf.deb \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY sf-bootstrap.sh /usr/local/bin/sf-bootstrap.sh
+RUN chmod +x /usr/local/bin/sf-bootstrap.sh
+
+# Override the slim image's ENTRYPOINT/CMD: bootstrap before launching the server.
+ENTRYPOINT ["/usr/local/bin/sf-bootstrap.sh"]
+CMD ["node", "dist/server.js"]
