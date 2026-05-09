@@ -44,6 +44,15 @@ RUN go build -ldflags="-s -w" -o /out/ga4-pp-cli ./cmd/ga4-pp-cli \
  && go build -ldflags="-s -w" -o /out/ga4-pp-mcp ./cmd/ga4-pp-mcp \
  && extract-recipes.sh SKILL.md ga4-pp-cli > /out/docs/ga4.md
 
+FROM golang:1.26-bookworm AS sf-builder
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=sf-src . /src
+WORKDIR /src
+ENV CGO_ENABLED=0 GOFLAGS="-trimpath"
+RUN go build -ldflags="-s -w" -o /out/screaming-frog-pp-cli ./cmd/screaming-frog-pp-cli \
+ && go build -ldflags="-s -w" -o /out/screaming-frog-pp-mcp ./cmd/screaming-frog-pp-mcp
+
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -66,6 +75,8 @@ COPY --from=go-builder /out/contentful-pp-cli /usr/local/bin/contentful-pp-cli
 COPY --from=go-builder /out/contentful-pp-mcp /usr/local/bin/contentful-pp-mcp
 COPY --from=go-builder /out/ga4-pp-cli /usr/local/bin/ga4-pp-cli
 COPY --from=go-builder /out/ga4-pp-mcp /usr/local/bin/ga4-pp-mcp
+COPY --from=sf-builder /out/screaming-frog-pp-cli /usr/local/bin/screaming-frog-pp-cli
+COPY --from=sf-builder /out/screaming-frog-pp-mcp /usr/local/bin/screaming-frog-pp-mcp
 
 # Stage the per-CLI recipes-only docs from go-builder, then append any
 # worker-local addenda (extra recipes, bug-workarounds) at /app/docs/<cli>.md.

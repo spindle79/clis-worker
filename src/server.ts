@@ -3,6 +3,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamText } from "hono/streaming";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { spawn } from "node:child_process";
 import {
   createWriteStream,
   mkdirSync,
@@ -24,6 +25,14 @@ Available CLIs (each has a recipes doc at /app/docs/<name>.md):
   scrape-creators-pp-cli  Social platforms — TikTok, Instagram, YouTube, X, Reddit, Threads, etc.
   contentful-pp-cli       Contentful CMS — entries, content types, environment diff, orphans, references.
   ga4-pp-cli              Google Analytics 4 — page analytics, funnels, drift, real-time.
+  screaming-frog-pp-cli   — Screaming Frog SEO Spider wrapper. Crawls websites headlessly
+                            (crawl, crawl list/sitemap/sitemap-list), runs focused audits
+                            (broken-links, on-page-seo, structured-data, accessibility,
+                            performance), generates sitemaps, and re-exports from saved
+                            .seospider files. Persists runs to local SQLite for diff,
+                            search, and sql across runs. Run 'screaming-frog-pp-cli doctor'
+                            first to confirm the SF binary is available in this deploy
+                            (the slim image does not include it).
 
 Before running a CLI you don't already have its recipes loaded for in
 this turn, run:
@@ -72,7 +81,27 @@ const requireAuth: MiddlewareHandler = async (c, next) => {
 
 app.get("/", (c) => c.text("clis-worker ready"));
 
-app.get("/health", (c) =>
+async function probeScreamingFrog(): Promise<unknown> {
+  return new Promise((resolve) => {
+    try {
+      const proc = spawn("screaming-frog-pp-cli", ["doctor", "--json"], { timeout: 2000 });
+      let stdout = "";
+      proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
+      proc.on("error", () => resolve({ binary_resolved: false, error: "doctor binary not found" }));
+      proc.on("close", () => {
+        try {
+          resolve(JSON.parse(stdout));
+        } catch {
+          resolve({ binary_resolved: false, error: "doctor returned non-json" });
+        }
+      });
+    } catch (e) {
+      resolve({ binary_resolved: false, error: String(e) });
+    }
+  });
+}
+
+app.get("/health", async (c) =>
   c.json({
     ok: true,
     model: MODEL,
@@ -84,6 +113,7 @@ app.get("/health", (c) =>
     hasContentfulSpace: Boolean(process.env.CONTENTFUL_SPACE_ID),
     hasGa4Credentials: Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS),
     hasGa4PropertyId: Boolean(process.env.GA_PROPERTY_ID),
+    hasScreamingFrog: await probeScreamingFrog(),
   }),
 );
 
