@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, beforeAll } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, renameSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, renameSync, copyFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ const fakeCli = path.join(repoRoot, "eval-mocks/test/fixtures/fake-pp-cli");
 let fixtureDir: string;
 let mockBinDir: string;
 let dispatcherTarget: string;
+let perTestFakeCli: string;
 
 beforeAll(() => {
   // The dispatcher binary must be built before this test runs.
@@ -39,6 +40,12 @@ beforeEach(() => {
   // Per-test bin dir with one symlink pretending to be fake-pp-cli
   mockBinDir = mkdtempSync(path.join(tmpdir(), "eval-bin-"));
   spawnSync("ln", ["-s", dispatcherTarget, path.join(mockBinDir, "fake-pp-cli")]);
+
+  // Copy the shared fake-pp-cli into a per-test path so we can rename it
+  // without affecting parallel test files (dispatcher-record.test.ts also uses it).
+  perTestFakeCli = path.join(mockBinDir, "real-fake-pp-cli");
+  copyFileSync(fakeCli, perTestFakeCli);
+  chmodSync(perTestFakeCli, 0o755);
 });
 
 function runDispatcher(argv: string[], mode: string): { stdout: string; stderr: string; code: number } {
@@ -48,7 +55,7 @@ function runDispatcher(argv: string[], mode: string): { stdout: string; stderr: 
       ...process.env,
       EVAL_MOCK_MODE: mode,
       EVAL_FIXTURE_DIR: fixtureDir,
-      EVAL_REAL_CLI_PATH: fakeCli,
+      EVAL_REAL_CLI_PATH: perTestFakeCli,
     },
     encoding: "utf8",
   });
@@ -62,15 +69,16 @@ describe("end-to-end record/replay/miss", () => {
     expect(rec.stdout).toMatch(/email_[0-9a-f]{8}/);
     expect(rec.stdout).not.toContain("alice@example.com");
 
-    // Move the real CLI out of the way to prove replay isn't shelling out.
-    const moved = `${fakeCli}.moved`;
-    renameSync(fakeCli, moved);
+    // Move the per-test copy out of the way to prove replay isn't shelling out.
+    // We rename the copy (not the shared fakeCli) to avoid racing with parallel test files.
+    const moved = `${perTestFakeCli}.moved`;
+    renameSync(perTestFakeCli, moved);
     try {
       const rep = runDispatcher(["json"], "replay");
       expect(rep.code).toBe(0);
       expect(rep.stdout).toBe(rec.stdout);
     } finally {
-      renameSync(moved, fakeCli);
+      renameSync(moved, perTestFakeCli);
     }
   });
 

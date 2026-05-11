@@ -7,14 +7,15 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
+    "build:eval": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "review": "tsx scripts/review.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval:setup": "tsx eval-mocks/scripts/setup-symlinks.ts",
+    "eval:setup": "npm run build:eval && tsx eval-mocks/scripts/setup-symlinks.ts",
     "local-eval": "tsx scripts/local-eval.ts",
     "local-eval:smoke": "tsx scripts/local-eval-smoke.ts",
     "eval:report": "tsx scripts/eval-report.ts"
