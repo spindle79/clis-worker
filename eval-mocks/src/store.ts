@@ -85,8 +85,8 @@ export function regenerateIndex(dir: string): void {
         entries.push({
           cli,
           filename: f,
-          slug: m[1],
-          hash: m[2],
+          slug: m[1]!,
+          hash: m[2]!,
           recorded_at: cassette.meta.recorded_at,
           cli_version: cassette.meta.cli_version,
         });
