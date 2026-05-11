@@ -9,6 +9,10 @@ import { createHash } from "node:crypto";
 
 const ANON_MARKER_RE = /^[a-z]+_[0-9a-f]{8}$/;
 
+function isAlreadyAnonymized(value: string): boolean {
+  return ANON_MARKER_RE.test(value) || value === "[redacted]";
+}
+
 function originalHash(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 8);
 }
@@ -133,7 +137,7 @@ function applyJsonRules(
     walk(obj, steps, (parent, key) => {
       const value = parent[key];
       if (typeof value !== "string") return;
-      if (ANON_MARKER_RE.test(value)) return; // already anonymized
+      if (isAlreadyAnonymized(value)) return; // already anonymized
       const replacement = field.strategy === "redact"
         ? "[redacted]"
         : hashReplacement(value, field.prefix ?? "val_");
