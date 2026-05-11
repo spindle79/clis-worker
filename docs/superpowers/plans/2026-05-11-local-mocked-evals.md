@@ -190,30 +190,34 @@ export interface AuditEntry {
 }
 
 export interface AuditLog {
-  cassette: string;             // filename it pairs with
+  cassette: string;             // sibling cassette filename, e.g. "channels-list--agent__a4b9c2d1.json"
   redactions: AuditEntry[];
   notes: string[];              // e.g. "skipped: non-JSON output"
 }
 
+export interface GlobalPattern {
+  name: string;               // human label, e.g. "email"
+  regex: string;              // compiled with default flags
+  strategy: "hash" | "redact";
+  prefix: string;             // e.g. "email_" → "email_a4b9c2d1"
+}
+
 export interface GlobalRules {
-  patterns: Array<{
-    name: string;               // human label, e.g. "email"
-    regex: string;              // compiled with default flags
-    strategy: "hash" | "redact";
-    prefix: string;             // e.g. "email_" → "email_a4b9c2d1"
-  }>;
+  patterns: GlobalPattern[];
   field_names: string[];        // case-insensitive field names always scrubbed
 }
 
+export interface CliField {
+  jsonpath: string;           // simple JSON-path subset (see anonymizer.ts)
+  strategy: "hash" | "redact";
+  prefix?: string;
+}
+
 export interface CliRules {
-  fields: Array<{
-    jsonpath: string;           // simple JSON-path subset (see anonymizer.ts)
-    strategy: "hash" | "redact";
-    prefix?: string;
-  }>;
+  fields: CliField[];
   env_whitelist: string[];      // env vars that affect output
   arg_normalization: "flag-order-insensitive" | "preserve-order";
-  prose_doctor: boolean;        // if true, doctor output is not parsed as JSON
+  doctor_emits_prose: boolean; // if true, the CLI's `doctor` subcommand emits prose, not JSON
 }
 
 export interface AnonymizerRules {
@@ -588,7 +592,7 @@ fields:
 env_whitelist:
   - SLACK_BOT_TOKEN
 arg_normalization: flag-order-insensitive
-prose_doctor: true
+doctor_emits_prose: true
 ```
 
 Create `eval-fixtures/.anonymize/scrape-creators-pp-cli.yaml`:
@@ -608,7 +612,7 @@ fields:
 env_whitelist:
   - SCRAPECREATORS_API_KEY
 arg_normalization: flag-order-insensitive
-prose_doctor: true
+doctor_emits_prose: true
 ```
 
 Create `eval-fixtures/.anonymize/contentful-pp-cli.yaml`:
@@ -627,7 +631,7 @@ env_whitelist:
   - CONTENTFUL_DELIVERY_TOKEN
   - CONTENTFUL_MANAGEMENT_TOKEN
 arg_normalization: flag-order-insensitive
-prose_doctor: true
+doctor_emits_prose: true
 ```
 
 Create `eval-fixtures/.anonymize/ga4-pp-cli.yaml`:
@@ -645,7 +649,7 @@ env_whitelist:
   - GA4_PROPERTY_ID
   - GOOGLE_APPLICATION_CREDENTIALS
 arg_normalization: flag-order-insensitive
-prose_doctor: true
+doctor_emits_prose: true
 ```
 
 Create `eval-fixtures/.anonymize/screaming-frog-pp-cli.yaml`:
@@ -659,7 +663,7 @@ fields:
 env_whitelist:
   - PRESS_DATA_DIR
 arg_normalization: flag-order-insensitive
-prose_doctor: true
+doctor_emits_prose: true
 ```
 
 - [ ] **Step 2: Write the failing loader tests**
@@ -708,7 +712,7 @@ fields:
   - { jsonpath: '$..channel.name', strategy: hash, prefix: channel_ }
 env_whitelist: [SLACK_BOT_TOKEN]
 arg_normalization: flag-order-insensitive
-prose_doctor: true
+doctor_emits_prose: true
 `,
     });
     const rules = loadRules(dir);
@@ -716,7 +720,7 @@ prose_doctor: true
     expect(rules.per_cli["slack-pp-cli"].fields).toHaveLength(1);
     expect(rules.per_cli["slack-pp-cli"].env_whitelist).toEqual(["SLACK_BOT_TOKEN"]);
     expect(rules.per_cli["slack-pp-cli"].arg_normalization).toBe("flag-order-insensitive");
-    expect(rules.per_cli["slack-pp-cli"].prose_doctor).toBe(true);
+    expect(rules.per_cli["slack-pp-cli"].doctor_emits_prose).toBe(true);
   });
 
   it("provides safe defaults when global.yaml is missing", () => {
@@ -771,7 +775,7 @@ export const DEFAULT_CLI_RULES: CliRules = {
   fields: [],
   env_whitelist: [],
   arg_normalization: "flag-order-insensitive",
-  prose_doctor: false,
+  doctor_emits_prose: false,
 };
 
 /**
@@ -808,7 +812,7 @@ export function loadRules(fixtureDir: string): AnonymizerRules {
       fields: parsed.fields ?? [],
       env_whitelist: parsed.env_whitelist ?? [],
       arg_normalization: parsed.arg_normalization ?? "flag-order-insensitive",
-      prose_doctor: parsed.prose_doctor ?? false,
+      doctor_emits_prose: parsed.doctor_emits_prose ?? false,
     };
   }
 
@@ -923,7 +927,7 @@ Create `eval-mocks/src/anonymizer-patterns.ts`:
 
 ```typescript
 import { createHash } from "node:crypto";
-import type { AuditEntry, GlobalRules } from "./types.js";
+import type { AuditEntry, GlobalPattern } from "./types.js";
 
 /**
  * Stable hash → human prefix replacement. Same `value` always produces
@@ -953,7 +957,7 @@ function originalHash(value: string): string {
  */
 export function applyPatterns(
   text: string,
-  patterns: GlobalRules["patterns"],
+  patterns: GlobalPattern[],
 ): { text: string; redactions: AuditEntry[] } {
   let out = text;
   const redactions: AuditEntry[] = [];
@@ -1027,7 +1031,7 @@ const rules: AnonymizerRules = {
       ],
       env_whitelist: ["SLACK_BOT_TOKEN"],
       arg_normalization: "flag-order-insensitive",
-      prose_doctor: true,
+      doctor_emits_prose: true,
     },
   },
 };
@@ -1991,7 +1995,7 @@ beforeEach(() => {
   );
   writeFileSync(
     path.join(fixtureDir, ".anonymize", "fake-pp-cli.yaml"),
-    `fields: []\nenv_whitelist: []\narg_normalization: flag-order-insensitive\nprose_doctor: false\n`,
+    `fields: []\nenv_whitelist: []\narg_normalization: flag-order-insensitive\ndoctor_emits_prose: false\n`,
   );
 });
 
@@ -2165,7 +2169,7 @@ function captureCliVersion(realCli: string, env: NodeJS.ProcessEnv): string {
 }
 
 function isJsonOutput(stdout: string, cliRules: CliRules, argv: string[]): boolean {
-  if (cliRules.prose_doctor && argv[0] === "doctor") return false;
+  if (cliRules.doctor_emits_prose && argv[0] === "doctor") return false;
   const trimmed = stdout.trimStart();
   return trimmed.startsWith("{") || trimmed.startsWith("[");
 }
@@ -2559,7 +2563,7 @@ beforeEach(() => {
   );
   writeFileSync(
     path.join(fixtureDir, ".anonymize/fake-pp-cli.yaml"),
-    "fields: []\nenv_whitelist: []\narg_normalization: flag-order-insensitive\nprose_doctor: false\n",
+    "fields: []\nenv_whitelist: []\narg_normalization: flag-order-insensitive\ndoctor_emits_prose: false\n",
   );
 
   // Per-test bin dir with one symlink pretending to be fake-pp-cli
@@ -3909,7 +3913,7 @@ Two layers (composable):
      the cassette key.
    - `arg_normalization`: `flag-order-insensitive` (default — sorts
      `--flag value` pairs) or `preserve-order`.
-   - `prose_doctor`: if `true`, `doctor` output is treated as prose
+   - `doctor_emits_prose`: if `true`, `doctor` output is treated as prose
      (no JSON parsing; pattern-scan only).
 
 Replacements use `hash(value)[:8]` with a human-readable prefix
@@ -3922,7 +3926,7 @@ shared identity-map file needed.
 1. Add the binary name to the `CLIS` array in
    `eval-mocks/scripts/setup-symlinks.ts`.
 2. Add `eval-fixtures/.anonymize/<cli>.yaml` with the CLI's fields,
-   env_whitelist, and (if doctor is prose) `prose_doctor: true`.
+   env_whitelist, and (if doctor is prose) `doctor_emits_prose: true`.
 3. Add fake values for any required env vars to `eval-fixtures/.env.eval`.
 4. `npm run build && npm run eval:setup` to create the new symlink.
 5. Record cassettes for the prompts you care about:
