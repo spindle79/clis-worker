@@ -1,0 +1,15 @@
+fields:
+  - jsonpath: '$..author.handle'
+    strategy: hash
+    prefix: handle_
+  - jsonpath: '$..creator.handle'
+    strategy: hash
+    prefix: handle_
+  - jsonpath: '$..url'
+    strategy: hash
+    prefix: url_
+
+env_whitelist:
+  - SCRAPECREATORS_API_KEY
+arg_normalization: flag-order-insensitive
+doctor_emits_prose: true

@@ -1,0 +1,14 @@
+fields:
+  - jsonpath: '$..sys.id'
+    strategy: hash
+    prefix: entry_
+  - jsonpath: '$..fields.title'
+    strategy: hash
+    prefix: title_
+
+env_whitelist:
+  - CONTENTFUL_SPACE_ID
+  - CONTENTFUL_DELIVERY_TOKEN
+  - CONTENTFUL_MANAGEMENT_TOKEN
+arg_normalization: flag-order-insensitive
+doctor_emits_prose: true
