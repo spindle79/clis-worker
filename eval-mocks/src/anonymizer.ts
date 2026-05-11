@@ -46,13 +46,13 @@ function parsePath(path: string): Step[] {
         // recursive descent: ..name
         const m = rest.slice(i + 2).match(/^([A-Za-z0-9_]+)/);
         if (!m) throw new Error(`anonymizer: bad descent in ${path}`);
-        steps.push({ kind: "descend", name: m[1] });
-        i += 2 + m[1].length;
+        steps.push({ kind: "descend", name: m![1]! });
+        i += 2 + m![1]!.length;
       } else {
         const m = rest.slice(i + 1).match(/^([A-Za-z0-9_]+)/);
         if (!m) throw new Error(`anonymizer: bad key in ${path}`);
-        steps.push({ kind: "key", name: m[1] });
-        i += 1 + m[1].length;
+        steps.push({ kind: "key", name: m![1]! });
+        i += 1 + m![1]!.length;
       }
     } else if (c === "[" && rest[i + 1] === "*" && rest[i + 2] === "]") {
       steps.push({ kind: "any-array" });
@@ -75,7 +75,7 @@ function walk(
   visit: (parent: any, key: string | number) => void,
 ): void {
   if (steps.length === 0) return;
-  const [step, ...rest] = steps;
+  const [step, ...rest] = steps as [Step, ...Step[]];
 
   const recurse = (node: unknown) => {
     if (node === null || typeof node !== "object") return;

@@ -37,7 +37,7 @@ export function normalizeArgv(argv: string[], mode: ArgNormalization): string[] 
   const pairs: Pair[] = [];
   let order = 0;
   for (let i = 0; i < expanded.length; i++) {
-    const tok = expanded[i];
+    const tok = expanded[i]!;
     if (tok.startsWith("--")) {
       const next = expanded[i + 1];
       if (next === undefined || next.startsWith("--")) {
