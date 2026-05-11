@@ -85,7 +85,7 @@ app.get("/", (c) => c.text("clis-worker ready"));
 async function probeScreamingFrog(): Promise<unknown> {
   return new Promise((resolve) => {
     try {
-      const proc = spawn("screaming-frog-pp-cli", ["doctor", "--json"], { timeout: 2000 });
+      const proc = spawn("screaming-frog-pp-cli", ["doctor", "--json"], { timeout: 2000, stdio: ["ignore", "pipe", "pipe"] });
       let stdout = "";
       proc.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
       proc.on("error", () => resolve({ binary_resolved: false, error: "doctor binary not found" }));
