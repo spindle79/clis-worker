@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Fake CLI used for integration tests. Returns canned JSON or version.
+set -e
+case "$1" in
+  --version)
+    echo "fake-pp-cli 0.1.0"
+    ;;
+  json)
+    echo '{"users":[{"id":"U001","email":"alice@example.com"}]}'
+    ;;
+  prose)
+    echo "auth ok for alice@example.com"
+    ;;
+  fail)
+    echo "boom" >&2
+    exit 5
+    ;;
+  *)
+    echo "unknown subcommand: $1" >&2
+    exit 2
+    ;;
+esac
