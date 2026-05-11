@@ -3,7 +3,14 @@ dist
 .env
 .env.*
 !.env.example
+!eval-fixtures/.env.eval
 *.log
 .DS_Store
 .data
 .worktrees/
+
+# Eval artifacts
+eval-runs/
+eval-mocks/bin/*
+!eval-mocks/bin/.gitkeep
+worker-stderr.log

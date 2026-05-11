@@ -11,7 +11,13 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "typecheck": "tsc --noEmit",
-    "review": "tsx scripts/review.ts"
+    "review": "tsx scripts/review.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "eval:setup": "tsx eval-mocks/scripts/setup-symlinks.ts",
+    "local-eval": "tsx scripts/local-eval.ts",
+    "local-eval:smoke": "tsx scripts/local-eval-smoke.ts",
+    "eval:report": "tsx scripts/eval-report.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138",
@@ -19,8 +25,11 @@
     "hono": "^4.6.14"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.0",
+    "js-yaml": "^4.1.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   }
 }
