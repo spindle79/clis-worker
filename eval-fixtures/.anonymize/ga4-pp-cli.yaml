@@ -1,0 +1,13 @@
+fields:
+  - jsonpath: '$..pagePath'
+    strategy: hash
+    prefix: path_
+  - jsonpath: '$..hostName'
+    strategy: hash
+    prefix: host_
+
+env_whitelist:
+  - GA4_PROPERTY_ID
+  - GOOGLE_APPLICATION_CREDENTIALS
+arg_normalization: flag-order-insensitive
+doctor_emits_prose: true

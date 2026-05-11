@@ -1,0 +1,24 @@
+# Global anonymization rules. Apply to every CLI's output before per-CLI
+# rules. Pattern rules scan strings; field_names rules scrub JSON values
+# whose key (case-insensitive) matches.
+
+patterns:
+  - name: email
+    regex: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
+    strategy: hash
+    prefix: email_
+  - name: e164-phone
+    regex: '\+[1-9]\d{6,14}'
+    strategy: hash
+    prefix: phone_
+
+field_names:
+  - email
+  - email_address
+  - phone
+  - phone_number
+  - display_name
+  - real_name
+  - first_name
+  - last_name
+  - full_name

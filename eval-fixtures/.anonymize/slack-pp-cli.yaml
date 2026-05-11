@@ -1,0 +1,19 @@
+# Per-CLI overrides for slack-pp-cli. Augments global rules.
+# JSONPath subset supported: $.foo, $.foo.bar, $.foo[*].bar, $..bar
+# (recursive descent). Other JSONPath features intentionally out of scope.
+
+fields:
+  - jsonpath: '$..channel.name'
+    strategy: hash
+    prefix: channel_
+  - jsonpath: '$..user.id'
+    strategy: hash
+    prefix: user_
+  - jsonpath: '$..team.domain'
+    strategy: hash
+    prefix: team_
+
+env_whitelist:
+  - SLACK_BOT_TOKEN
+arg_normalization: flag-order-insensitive
+doctor_emits_prose: true

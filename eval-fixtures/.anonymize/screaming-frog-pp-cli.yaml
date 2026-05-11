@@ -1,0 +1,9 @@
+fields:
+  - jsonpath: '$..url'
+    strategy: hash
+    prefix: url_
+
+env_whitelist:
+  - PRESS_DATA_DIR
+arg_normalization: flag-order-insensitive
+doctor_emits_prose: true
