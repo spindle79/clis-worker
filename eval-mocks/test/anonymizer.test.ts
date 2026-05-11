@@ -118,6 +118,39 @@ describe("anonymize (JSON path)", () => {
     expect(parsed.display_name).not.toBe("Alex"); // global field_names still applies
   });
 
+  it("is idempotent for the redact strategy too", () => {
+    const redactRules: AnonymizerRules = {
+      global: { patterns: [], field_names: [] },
+      per_cli: {
+        "slack-pp-cli": {
+          fields: [
+            { jsonpath: "$..token", strategy: "redact" },
+          ],
+          env_whitelist: [],
+          arg_normalization: "flag-order-insensitive",
+          doctor_emits_prose: false,
+        },
+      },
+    };
+    const first = anonymize({
+      cli: "slack-pp-cli",
+      output: JSON.stringify({ token: "secret123" }),
+      rules: redactRules,
+      isJson: true,
+    });
+    expect(JSON.parse(first.output).token).toBe("[redacted]");
+    expect(first.redactions).toHaveLength(1);
+
+    const second = anonymize({
+      cli: "slack-pp-cli",
+      output: first.output,
+      rules: redactRules,
+      isJson: true,
+    });
+    expect(second.output).toBe(first.output);
+    expect(second.redactions).toHaveLength(0);
+  });
+
   it("is idempotent: anonymizing an already-anonymized output is a no-op", () => {
     const first = anonymize({
       cli: "slack-pp-cli",

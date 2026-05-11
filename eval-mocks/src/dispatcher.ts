@@ -21,7 +21,14 @@ function getMode(env: Record<string, string | undefined>): MockMode {
 }
 
 export async function dispatch(opts: DispatchOptions): Promise<number> {
-  const mode = getMode(opts.env);
+  let mode: MockMode;
+  try {
+    mode = getMode(opts.env);
+  } catch (err) {
+    opts.stderr.write(`${(err as Error).message}\n`);
+    return 2;
+  }
+
   const fixtureDir = opts.env.EVAL_FIXTURE_DIR;
   if (!fixtureDir) {
     opts.stderr.write("EVAL_FIXTURE_DIR is required\n");

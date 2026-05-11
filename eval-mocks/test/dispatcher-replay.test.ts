@@ -85,6 +85,20 @@ describe("dispatch (replay mode)", () => {
     expect(code).toBe(3);
   });
 
+  it("returns exit 2 with a clear error when EVAL_MOCK_MODE is invalid", async () => {
+    const stderrCapture: string[] = [];
+    const code = await dispatch({
+      cli: "fake-pp-cli",
+      argv: ["doctor"],
+      stdin: "",
+      env: { EVAL_MOCK_MODE: "bogus", EVAL_FIXTURE_DIR: fixtureDir },
+      stdout: { write: () => true } as any,
+      stderr: { write: (s) => { stderrCapture.push(s); return true; } } as any,
+    });
+    expect(code).toBe(2);
+    expect(stderrCapture.join("")).toContain("EVAL_MOCK_MODE must be");
+  });
+
   it("returns EXIT_MOCK_MISS with EVAL_MOCK_MISS in stderr on miss", async () => {
     const stderrCapture: string[] = [];
     const code = await dispatch({
