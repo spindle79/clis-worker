@@ -25,14 +25,15 @@ Available CLIs (each has a recipes doc at /app/docs/<name>.md):
   scrape-creators-pp-cli  Social platforms — TikTok, Instagram, YouTube, X, Reddit, Threads, etc.
   contentful-pp-cli       Contentful CMS — entries, content types, environment diff, orphans, references.
   ga4-pp-cli              Google Analytics 4 — page analytics, funnels, drift, real-time.
-  screaming-frog-pp-cli   — Screaming Frog SEO Spider wrapper. Crawls websites headlessly
-                            (crawl, crawl list/sitemap/sitemap-list), runs focused audits
-                            (broken-links, on-page-seo, structured-data, accessibility,
-                            performance), generates sitemaps, and re-exports from saved
-                            .seospider files. Persists runs to local SQLite for diff,
-                            search, and sql across runs. Run 'screaming-frog-pp-cli doctor'
-                            first to confirm the SF binary is available in this deploy
-                            (the slim image does not include it).
+  screaming-frog-pp-cli   Screaming Frog local-store wrapper. On Render this CLI runs
+                          OFFLINE ONLY — the SF binary is not installed in this image, so
+                          'crawl' and 'audit broken-links|on-page-seo|structured-data|
+                          accessibility|performance' will fail at runtime (run 'doctor'
+                          first to confirm). What works against prior crawls in the local
+                          SQLite store: 'runs list', 'search', 'sql', 'diff <a> <b>', and
+                          the SEO compound commands (orphan-pages, redirect-chains,
+                          duplicate-titles, missing-meta, canonical-conflicts, thin-content).
+                          To run new crawls, run the CLI locally and rsync the data.db up.
 
 Before running a CLI you don't already have its recipes loaded for in
 this turn, run:
@@ -111,6 +112,8 @@ app.get("/health", async (c) =>
     hasSlackKey: Boolean(process.env.SLACK_BOT_TOKEN),
     hasContentfulKey: Boolean(process.env.CONTENTFUL_MANAGEMENT_TOKEN),
     hasContentfulSpace: Boolean(process.env.CONTENTFUL_SPACE_ID),
+    hasContentfulDeliveryToken: Boolean(process.env.CONTENTFUL_DELIVERY_TOKEN),
+    hasContentfulPreviewToken: Boolean(process.env.CONTENTFUL_PREVIEW_TOKEN),
     hasGa4Credentials: Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS),
     hasGa4PropertyId: Boolean(process.env.GA_PROPERTY_ID),
     hasScreamingFrog: await probeScreamingFrog(),
