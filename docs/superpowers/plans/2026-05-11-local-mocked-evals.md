@@ -477,7 +477,11 @@ export function slugify(argv: string[]): string {
     .slice(0, 5)
     .map((a) => a.replace(SLUG_UNSAFE, ""))
     .filter((a) => a.length > 0)
-    .join("-");
+    .join("-")
+    // Collapse 3+ consecutive dashes to 2 — handles the `--flag` case
+    // where joining ["list", "--agent"] would otherwise produce
+    // "list---agent" instead of the test-expected "list--agent".
+    .replace(/-{3,}/g, "--");
 }
 
 /**
