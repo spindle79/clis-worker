@@ -6,6 +6,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
 WORKDIR /build
 # Pinned to spindle79's fork so worker-relevant doc edits and patches can ship
 # from the same org. Sync upstream from mvanhorn/printing-press-library as needed.
+#
+# The ADD above each `git clone` re-fetches GitHub's commit metadata for the
+# target branch on every Docker build. The response content (latest commit
+# SHA, author, timestamp) changes whenever upstream advances, which busts
+# the cache for the subsequent `RUN git clone` layer. Without this, Docker
+# treats the byte-identical `RUN git clone` line as a cache hit and bakes
+# stale CLI binaries into the image — see the May 2026 ga4 `top` rollout
+# where every deploy after the push still served the pre-`top` binary until
+# a manual `render deploys create --clear-cache`.
+ADD https://api.github.com/repos/spindle79/printing-press-library/commits/main /tmp/printing-press-library-rev
 RUN git clone --depth=1 https://github.com/spindle79/printing-press-library.git
 ENV CGO_ENABLED=0 GOFLAGS="-trimpath"
 
@@ -28,6 +38,7 @@ RUN go build -ldflags="-s -w" -o /out/slack-pp-cli ./cmd/slack-pp-cli \
 # contentful-pp-cli ships as a standalone repo (not part of the printing-press-library
 # monorepo), so it gets its own clone + build pair.
 WORKDIR /build
+ADD https://api.github.com/repos/spindle79/contentful-pp-cli/commits/main /tmp/contentful-pp-cli-rev
 RUN git clone --depth=1 https://github.com/spindle79/contentful-pp-cli.git
 WORKDIR /build/contentful-pp-cli
 RUN go build -ldflags="-s -w" -o /out/contentful-pp-cli ./cmd/contentful-pp-cli \
@@ -38,6 +49,7 @@ RUN go build -ldflags="-s -w" -o /out/contentful-pp-cli ./cmd/contentful-pp-cli 
 # as contentful-pp-cli; push the local clis/ga4-pp-cli/ tree to spindle79/ga4-pp-cli
 # before this build runs.
 WORKDIR /build
+ADD https://api.github.com/repos/spindle79/ga4-pp-cli/commits/main /tmp/ga4-pp-cli-rev
 RUN git clone --depth=1 https://github.com/spindle79/ga4-pp-cli.git
 WORKDIR /build/ga4-pp-cli
 RUN go build -ldflags="-s -w" -o /out/ga4-pp-cli ./cmd/ga4-pp-cli \
@@ -47,6 +59,7 @@ RUN go build -ldflags="-s -w" -o /out/ga4-pp-cli ./cmd/ga4-pp-cli \
 # screaming-frog-pp-cli — Headless wrapper around Screaming Frog SEO Spider.
 # Same standalone-repo pattern as contentful / ga4.
 WORKDIR /build
+ADD https://api.github.com/repos/spindle79/screaming-frog-pp-cli/commits/main /tmp/screaming-frog-pp-cli-rev
 RUN git clone --depth=1 https://github.com/spindle79/screaming-frog-pp-cli.git
 WORKDIR /build/screaming-frog-pp-cli
 RUN go build -ldflags="-s -w" -o /out/screaming-frog-pp-cli ./cmd/screaming-frog-pp-cli \
