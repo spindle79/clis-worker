@@ -4,6 +4,7 @@ import { cors } from "hono/cors";
 import { streamText } from "hono/streaming";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import Anthropic from "@anthropic-ai/sdk";
+import { runVariations } from "./variations.js";
 import { spawn } from "node:child_process";
 import {
   createWriteStream,
@@ -57,7 +58,7 @@ store is at $PRESS_DATA_DIR — use 'sync' to populate it and
 Be concise. Return the answer the caller asked for, not a play-by-play
 of your tool calls.`;
 
-const app = new Hono();
+export const app = new Hono();
 
 app.use(
   "*",
@@ -270,6 +271,72 @@ app.post("/oneshot", requireAuth, async (c) => {
   }
 });
 
+type VariationsBody = {
+  prompt?: string;
+  system?: string;
+  model?: string;
+  maxTokens?: number;
+  count?: number;
+  responseSchema?: {
+    name?: string;
+    description?: string;
+    schema?: Record<string, unknown>;
+  };
+};
+
+app.post("/variations", requireAuth, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as VariationsBody;
+  if (!body.prompt) return c.json({ error: "prompt required" }, 400);
+  if (!body.responseSchema?.schema) {
+    return c.json({ error: "responseSchema.schema required" }, 400);
+  }
+
+  const count = body.count ?? 3;
+  if (!Number.isInteger(count) || count < 1 || count > 5) {
+    return c.json(
+      { error: "invalid-count", message: "count must be an integer in [1, 5]" },
+      400,
+    );
+  }
+
+  const userProps = (body.responseSchema.schema as {
+    properties?: Record<string, unknown>;
+  }).properties;
+  const valueSchema = userProps?.value;
+  if (!valueSchema || typeof valueSchema !== "object") {
+    return c.json(
+      {
+        error: "invalid-schema",
+        message: "responseSchema.schema.properties.value required",
+      },
+      400,
+    );
+  }
+
+  try {
+    const result = await runVariations(anthropic, {
+      prompt: body.prompt,
+      system: body.system,
+      model: body.model ?? ONESHOT_MODEL,
+      maxTokens: body.maxTokens ?? 1024,
+      count,
+      valueSchema: valueSchema as Record<string, unknown>,
+    });
+    if (!result.ok) {
+      const status = result.error === "anthropic-error" ? 502 : 500;
+      return c.json({ error: result.error, message: result.message }, status);
+    }
+    return c.json({
+      variations: result.variations,
+      model: result.model,
+      usage: result.usage,
+      stopReason: result.stopReason,
+    });
+  } catch (err) {
+    return c.json({ error: "internal-error", message: String(err) }, 500);
+  }
+});
+
 const TRANSCRIPT_FILE_RE = /^\d+\.jsonl$/;
 const DAY_DIR_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -409,6 +476,8 @@ app.get("/transcripts/:date/:file", requireAuth, async (c) => {
   }
 });
 
-serve({ fetch: app.fetch, port: PORT }, ({ port }) => {
-  console.log(`clis-worker listening on :${port} (data: ${DATA_DIR})`);
-});
+if (!process.env.CLIS_WORKER_NO_AUTO_SERVE) {
+  serve({ fetch: app.fetch, port: PORT }, ({ port }) => {
+    console.log(`clis-worker listening on :${port} (data: ${DATA_DIR})`);
+  });
+}
