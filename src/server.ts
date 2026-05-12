@@ -3,6 +3,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamText } from "hono/streaming";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { spawn } from "node:child_process";
 import {
   createWriteStream,
@@ -17,6 +18,9 @@ const DATA_DIR = process.env.PRESS_DATA_DIR ?? "/data";
 const TRANSCRIPTS_DIR = path.join(DATA_DIR, "transcripts");
 const WORKER_API_KEY = process.env.WORKER_API_KEY;
 const MODEL = process.env.AGENT_MODEL ?? "claude-haiku-4-5-20251001";
+const ONESHOT_MODEL = process.env.ONESHOT_MODEL ?? "claude-haiku-4-5-20251001";
+
+const anthropic = new Anthropic();
 
 const SYSTEM_PROMPT = `You are an agent with access to printing-press CLIs installed on PATH.
 
@@ -184,6 +188,86 @@ app.post("/agent", requireAuth, async (c) => {
       log.close();
     }
   });
+});
+
+type OneshotBody = {
+  prompt?: string;
+  system?: string;
+  model?: string;
+  maxTokens?: number;
+  responseSchema?: {
+    name: string;
+    description?: string;
+    schema: Record<string, unknown>;
+  };
+};
+
+app.post("/oneshot", requireAuth, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as OneshotBody;
+  if (!body.prompt) return c.json({ error: "prompt required" }, 400);
+
+  const model = body.model ?? ONESHOT_MODEL;
+  const maxTokens = body.maxTokens ?? 1024;
+
+  try {
+    if (body.responseSchema) {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system: body.system,
+        tools: [
+          {
+            name: body.responseSchema.name,
+            description: body.responseSchema.description ?? "Submit the result",
+            input_schema: body.responseSchema.schema as Anthropic.Tool.InputSchema,
+          },
+        ],
+        tool_choice: { type: "tool", name: body.responseSchema.name },
+        messages: [{ role: "user", content: body.prompt }],
+      });
+
+      const toolUse = response.content.find(
+        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+      );
+      if (!toolUse) {
+        return c.json(
+          { error: "no-tool-use", stopReason: response.stop_reason },
+          502,
+        );
+      }
+      return c.json({
+        value: toolUse.input,
+        model: response.model,
+        usage: response.usage,
+        stopReason: response.stop_reason,
+      });
+    }
+
+    const response = await anthropic.messages.create({
+      model,
+      max_tokens: maxTokens,
+      system: body.system,
+      messages: [{ role: "user", content: body.prompt }],
+    });
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+    return c.json({
+      text,
+      model: response.model,
+      usage: response.usage,
+      stopReason: response.stop_reason,
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.APIError) {
+      return c.json(
+        { error: "anthropic-error", status: err.status, message: err.message },
+        502,
+      );
+    }
+    return c.json({ error: "internal-error", message: String(err) }, 500);
+  }
 });
 
 const TRANSCRIPT_FILE_RE = /^\d+\.jsonl$/;
