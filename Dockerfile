@@ -66,6 +66,17 @@ RUN go build -ldflags="-s -w" -o /out/screaming-frog-pp-cli ./cmd/screaming-frog
  && go build -ldflags="-s -w" -o /out/screaming-frog-pp-mcp ./cmd/screaming-frog-pp-mcp \
  && extract-recipes.sh SKILL.md screaming-frog-pp-cli > /out/docs/screaming-frog-pp-cli.md
 
+# higgsfield — third-party CLI (NOT printing-press). The npm package
+# `@higgsfield/cli` is just a node shim around a Go binary `hf` distributed
+# via GitHub releases; we fetch the binary directly to skip the postinstall
+# hop and the node shim entirely. Bump HIGGSFIELD_VERSION to upgrade.
+FROM debian:bookworm-slim AS hf-fetch
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+ARG HIGGSFIELD_VERSION=0.1.40
+ADD https://github.com/higgsfield-ai/cli/releases/download/v${HIGGSFIELD_VERSION}/hf_${HIGGSFIELD_VERSION}_linux_amd64.tar.gz /tmp/hf.tar.gz
+RUN tar -xzf /tmp/hf.tar.gz -C /tmp && chmod +x /tmp/hf
+
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -91,6 +102,19 @@ COPY --from=go-builder /out/ga4-pp-mcp /usr/local/bin/ga4-pp-mcp
 COPY --from=go-builder /out/screaming-frog-pp-cli /usr/local/bin/screaming-frog-pp-cli
 COPY --from=go-builder /out/screaming-frog-pp-mcp /usr/local/bin/screaming-frog-pp-mcp
 
+# higgsfield CLI binary + the npm-package aliases (`higgsfield`, `higgs`) as
+# symlinks so the agent can invoke it under any of the documented names.
+COPY --from=hf-fetch /tmp/hf /usr/local/bin/hf
+RUN ln -s /usr/local/bin/hf /usr/local/bin/higgsfield \
+ && ln -s /usr/local/bin/hf /usr/local/bin/higgs
+
+# higgsfield stores its device-login token at
+# $XDG_CONFIG_HOME/higgsfield/credentials.json and rewrites the file on every
+# refresh. Pin XDG_CONFIG_HOME inside /data so the rotated token survives
+# container restarts on Render's persistent disk. (None of the other bundled
+# CLIs read XDG_CONFIG_HOME, so this is scoped in effect to higgsfield.)
+ENV XDG_CONFIG_HOME=/data/higgsfield-config
+
 # Stage the per-CLI recipes-only docs from go-builder, then append any
 # worker-local addenda (extra recipes, bug-workarounds) at /app/docs/<cli>.md.
 # The router that picks which doc to read lives in the worker's system prompt;
@@ -108,6 +132,10 @@ RUN if [ -d /tmp/docs-addenda ]; then \
       done; \
       rm -rf /tmp/docs-addenda; \
     fi
+
+# higgsfield is not a printing-press CLI, so there's no upstream SKILL.md to
+# slim into /app/docs/. Ship a hand-written recipes doc instead.
+COPY docs/higgsfield.md /app/docs/higgsfield.md
 
 # Don't reuse the host-generated lockfile here — its optional-dep selections are
 # platform-specific (the Agent SDK ships native binaries per platform/libc).
@@ -129,6 +157,12 @@ ENV NODE_ENV=production \
     PORT=3000
 RUN mkdir -p /data
 
+# Entrypoint script seeds the higgsfield credentials.json from a Render
+# Secret File to the writable persistent disk on first boot, then execs the
+# server. New per-CLI bootstrap steps go here too.
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 3000
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["node", "dist/server.js"]
+CMD ["/usr/local/bin/entrypoint.sh"]
