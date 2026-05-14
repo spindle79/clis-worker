@@ -10,6 +10,14 @@ services:
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Long-lived OAuth token for the Claude Code CLI (backs the /claude
+      # endpoint). Generate locally with `claude setup-token` while logged
+      # in to your Pro/Max subscription, then paste the value here.
+      # Do NOT also set ANTHROPIC_API_KEY for the same process — claude
+      # prefers the API key when both are present, which would bill against
+      # API credit instead of the subscription.
+      - key: CLAUDE_CODE_OAUTH_TOKEN
+        sync: false
       - key: SCRAPE_CREATORS_API_KEY_AUTH
         sync: false
       - key: SLACK_BOT_TOKEN

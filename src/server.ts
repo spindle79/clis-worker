@@ -5,6 +5,7 @@ import { streamText } from "hono/streaming";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import Anthropic from "@anthropic-ai/sdk";
 import { runVariations } from "./variations.js";
+import { callClaudeCli, ClaudeCliError, whichClaude } from "./claude-cli.js";
 import { spawn } from "node:child_process";
 import {
   createWriteStream,
@@ -107,12 +108,16 @@ async function probeScreamingFrog(): Promise<unknown> {
   });
 }
 
-app.get("/health", async (c) =>
-  c.json({
+app.get("/health", async (c) => {
+  const claudeBinary = await whichClaude();
+  return c.json({
     ok: true,
     model: MODEL,
     dataDir: DATA_DIR,
     hasAnthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
+    hasClaudeCli: Boolean(claudeBinary),
+    claudeCliPath: claudeBinary,
+    hasClaudeCodeOAuthToken: Boolean(process.env.CLAUDE_CODE_OAUTH_TOKEN),
     hasScrapeCreatorsKey: Boolean(process.env.SCRAPE_CREATORS_API_KEY_AUTH),
     hasSlackKey: Boolean(process.env.SLACK_BOT_TOKEN),
     hasContentfulKey: Boolean(process.env.CONTENTFUL_MANAGEMENT_TOKEN),
@@ -122,8 +127,8 @@ app.get("/health", async (c) =>
     hasGa4Credentials: Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS),
     hasGa4PropertyId: Boolean(process.env.GA_PROPERTY_ID),
     hasScreamingFrog: await probeScreamingFrog(),
-  }),
-);
+  });
+});
 
 function openTranscriptLog(prompt: string): {
   write: (line: string) => void;
@@ -265,6 +270,52 @@ app.post("/oneshot", requireAuth, async (c) => {
       return c.json(
         { error: "anthropic-error", status: err.status, message: err.message },
         502,
+      );
+    }
+    return c.json({ error: "internal-error", message: String(err) }, 500);
+  }
+});
+
+type ClaudeBody = {
+  prompt?: string;
+  system?: string;
+  timeoutSeconds?: number;
+};
+
+app.post("/claude", requireAuth, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as ClaudeBody;
+  if (!body.prompt) return c.json({ error: "prompt required" }, 400);
+
+  try {
+    const result = await callClaudeCli({
+      userMessage: body.prompt,
+      systemPrompt: body.system,
+      timeoutSeconds: body.timeoutSeconds,
+    });
+    return c.json({
+      text: result.result,
+      model: result.model,
+      usage: {
+        input_tokens: result.inputTokens,
+        output_tokens: result.outputTokens,
+      },
+      stopReason: result.finishReason,
+    });
+  } catch (err) {
+    if (err instanceof ClaudeCliError) {
+      const status =
+        err.code === "missing-binary"
+          ? 503
+          : err.code === "timeout"
+            ? 504
+            : 502;
+      return c.json(
+        {
+          error: err.code,
+          message: err.message,
+          ...(err.details ?? {}),
+        },
+        status,
       );
     }
     return c.json({ error: "internal-error", message: String(err) }, 500);

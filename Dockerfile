@@ -116,6 +116,12 @@ COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --no-package-lock
 
+# Claude Code CLI — backs the /claude endpoint. Authenticates against the
+# operator's Pro/Max subscription via CLAUDE_CODE_OAUTH_TOKEN at runtime;
+# nothing is baked into the image.
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g @anthropic-ai/claude-code
+
 COPY --from=node-builder /app/dist ./dist
 
 ENV NODE_ENV=production \
