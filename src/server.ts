@@ -6,6 +6,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import Anthropic from "@anthropic-ai/sdk";
 import { runVariations } from "./variations.js";
 import { callClaudeCli, ClaudeCliError, whichClaude } from "./claude-cli.js";
+import { runClaudeCliVariations } from "./claude-cli-variations.js";
 import { spawn } from "node:child_process";
 import {
   createWriteStream,
@@ -375,6 +376,70 @@ app.post("/variations", requireAuth, async (c) => {
     });
     if (!result.ok) {
       const status = result.error === "anthropic-error" ? 502 : 500;
+      return c.json({ error: result.error, message: result.message }, status);
+    }
+    return c.json({
+      variations: result.variations,
+      model: result.model,
+      usage: result.usage,
+      stopReason: result.stopReason,
+    });
+  } catch (err) {
+    return c.json({ error: "internal-error", message: String(err) }, 500);
+  }
+});
+
+type ClaudeVariationsBody = {
+  prompt?: string;
+  system?: string;
+  count?: number;
+  timeoutSeconds?: number;
+  responseSchema?: {
+    name?: string;
+    description?: string;
+    schema?: Record<string, unknown>;
+  };
+};
+
+app.post("/claude-variations", requireAuth, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as ClaudeVariationsBody;
+  if (!body.prompt) return c.json({ error: "prompt required" }, 400);
+  if (!body.responseSchema?.schema) {
+    return c.json({ error: "responseSchema.schema required" }, 400);
+  }
+
+  const count = body.count ?? 3;
+  if (!Number.isInteger(count) || count < 1 || count > 5) {
+    return c.json(
+      { error: "invalid-count", message: "count must be an integer in [1, 5]" },
+      400,
+    );
+  }
+
+  const userProps = (body.responseSchema.schema as {
+    properties?: Record<string, unknown>;
+  }).properties;
+  const valueSchema = userProps?.value;
+  if (!valueSchema || typeof valueSchema !== "object") {
+    return c.json(
+      {
+        error: "invalid-schema",
+        message: "responseSchema.schema.properties.value required",
+      },
+      400,
+    );
+  }
+
+  try {
+    const result = await runClaudeCliVariations({
+      prompt: body.prompt,
+      system: body.system,
+      count,
+      valueSchema: valueSchema as Record<string, unknown>,
+      timeoutSeconds: body.timeoutSeconds,
+    });
+    if (!result.ok) {
+      const status = result.error === "claude-cli-error" ? 502 : 500;
       return c.json({ error: result.error, message: result.message }, status);
     }
     return c.json({
