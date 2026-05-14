@@ -47,5 +47,8 @@ The `SCREAMING_FROG_VERSION` build arg overrides the pinned SF `.deb` version (d
 ## Endpoints
 
 - `GET /` — readiness ping (text)
-- `GET /health` — JSON readiness with `hasScreamingFrog: { binary_resolved, ... }`
+- `GET /health` — JSON readiness with `hasScreamingFrog: { binary_resolved, ... }` and `hasHiggsfieldCredentials`
 - `POST /agent` — streaming agent endpoint (requires `Authorization: Bearer $WORKER_API_KEY` if set)
+- `POST /generate/image` — body `{prompt, model?, image?}`. Runs the user prompt through Claude with the higgsfield-generate SKILL.md as system prompt to pick a model and enhance the prompt, then submits a higgsfield job (no `--wait`). Returns `{job_id, status, model, enhanced_prompt, extra_args, poll_url}` immediately.
+- `POST /generate/video` — same shape, video models only.
+- `GET /generate/:job_id` — poll status; returns `{job_id, status, urls, raw}`. Client should poll every ~5s until `status` is terminal (`completed` / `failed`).
