@@ -77,6 +77,19 @@ ARG HIGGSFIELD_VERSION=0.1.40
 ADD https://github.com/higgsfield-ai/cli/releases/download/v${HIGGSFIELD_VERSION}/hf_${HIGGSFIELD_VERSION}_linux_amd64.tar.gz /tmp/hf.tar.gz
 RUN tar -xzf /tmp/hf.tar.gz -C /tmp && chmod +x /tmp/hf
 
+# higgsfield-ai/skills — published model-selection + prompt-engineering ruleset
+# used by the /generate/image and /generate/video endpoints. The endpoints
+# load higgsfield-generate/SKILL.md as the system prompt for a Claude
+# tool-use call that picks a model and rewrites the user's prompt before
+# the actual `higgsfield generate create` runs. Same cache-bust trick as
+# the printing-press repos so a push to higgsfield-ai/skills:main
+# propagates on the next image rebuild.
+FROM debian:bookworm-slim AS higgsfield-skills
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+ADD https://api.github.com/repos/higgsfield-ai/skills/commits/main /tmp/higgsfield-skills-rev
+RUN git clone --depth=1 https://github.com/higgsfield-ai/skills.git /skills
+
 FROM node:24-bookworm-slim AS node-builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -136,6 +149,10 @@ RUN if [ -d /tmp/docs-addenda ]; then \
 # higgsfield is not a printing-press CLI, so there's no upstream SKILL.md to
 # slim into /app/docs/. Ship a hand-written recipes doc instead.
 COPY docs/higgsfield.md /app/docs/higgsfield.md
+
+# higgsfield-generate skill from higgsfield-ai/skills. Loaded at runtime as
+# the system prompt for prompt enhancement on /generate/{image,video}.
+COPY --from=higgsfield-skills /skills/higgsfield-generate /app/higgsfield-skills/generate
 
 # Don't reuse the host-generated lockfile here — its optional-dep selections are
 # platform-specific (the Agent SDK ships native binaries per platform/libc).

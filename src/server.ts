@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { streamText } from "hono/streaming";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -7,6 +7,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { runVariations } from "./variations.js";
 import { callClaudeCli, ClaudeCliError, whichClaude } from "./claude-cli.js";
 import { runClaudeCliVariations } from "./claude-cli-variations.js";
+import {
+  enhancePrompt,
+  getJob,
+  HiggsfieldError,
+  submitJob,
+  type MediaType,
+} from "./higgsfield-generate.js";
 import { spawn } from "node:child_process";
 import {
   createWriteStream,
@@ -468,6 +475,102 @@ app.post("/claude-variations", requireAuth, async (c) => {
       stopReason: result.stopReason,
     });
   } catch (err) {
+    return c.json({ error: "internal-error", message: String(err) }, 500);
+  }
+});
+
+const HIGGSFIELD_ENHANCER_MODEL =
+  process.env.HIGGSFIELD_ENHANCER_MODEL ?? ONESHOT_MODEL;
+const HIGGSFIELD_JOB_ID_RE = /^[A-Za-z0-9_-]+$/;
+
+type GenerateBody = {
+  prompt?: string;
+  model?: string;
+  image?: string;
+};
+
+async function handleGenerate(c: Context, mediaType: MediaType) {
+  const body = (await c.req.json().catch(() => ({}))) as GenerateBody;
+  const prompt = (body.prompt ?? "").trim();
+  if (!prompt) return c.json({ error: "prompt required" }, 400);
+  const imageUploadId = body.image?.trim() || undefined;
+
+  let plan;
+  try {
+    plan = await enhancePrompt({
+      anthropic,
+      mediaType,
+      userPrompt: prompt,
+      imageUploadId,
+      model: body.model?.trim() || undefined,
+      enhancerModel: HIGGSFIELD_ENHANCER_MODEL,
+    });
+  } catch (err) {
+    if (err instanceof HiggsfieldError) {
+      const status =
+        err.code === "skill-missing"
+          ? 503
+          : err.code === "anthropic-error"
+            ? 502
+            : 500;
+      return c.json({ error: err.code, message: err.message }, status);
+    }
+    return c.json({ error: "internal-error", message: String(err) }, 500);
+  }
+
+  let submitted;
+  try {
+    submitted = await submitJob({ plan, imageUploadId });
+  } catch (err) {
+    if (err instanceof HiggsfieldError) {
+      const status = err.code === "cli-timeout" ? 504 : 502;
+      return c.json(
+        {
+          error: err.code,
+          message: err.message,
+          plan,
+          ...(err.details ?? {}),
+        },
+        status,
+      );
+    }
+    return c.json({ error: "internal-error", message: String(err) }, 500);
+  }
+
+  return c.json({
+    job_id: submitted.job_id,
+    status: submitted.status,
+    model: plan.model,
+    enhanced_prompt: plan.enhanced_prompt,
+    extra_args: plan.extra_args,
+    poll_url: `/generate/${submitted.job_id}`,
+  });
+}
+
+app.post("/generate/image", requireAuth, (c) => handleGenerate(c, "image"));
+app.post("/generate/video", requireAuth, (c) => handleGenerate(c, "video"));
+
+app.get("/generate/:job_id", requireAuth, async (c) => {
+  const jobId = c.req.param("job_id");
+  if (!HIGGSFIELD_JOB_ID_RE.test(jobId)) {
+    return c.json({ error: "invalid-job-id" }, 400);
+  }
+  try {
+    const job = await getJob(jobId);
+    return c.json({
+      job_id: job.job_id,
+      status: job.status,
+      urls: job.urls,
+      raw: job.raw,
+    });
+  } catch (err) {
+    if (err instanceof HiggsfieldError) {
+      const status = err.code === "cli-timeout" ? 504 : 502;
+      return c.json(
+        { error: err.code, message: err.message, ...(err.details ?? {}) },
+        status,
+      );
+    }
     return c.json({ error: "internal-error", message: String(err) }, 500);
   }
 });
