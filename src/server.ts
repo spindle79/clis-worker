@@ -10,6 +10,7 @@ import { runClaudeCliVariations } from "./claude-cli-variations.js";
 import { spawn } from "node:child_process";
 import {
   createWriteStream,
+  existsSync,
   mkdirSync,
   type WriteStream,
 } from "node:fs";
@@ -41,6 +42,10 @@ Available CLIs (each has a recipes doc at /app/docs/<name>.md):
                           the SEO compound commands (orphan-pages, redirect-chains,
                           duplicate-titles, missing-meta, canonical-conflicts, thin-content).
                           To run new crawls, run the CLI locally and rsync the data.db up.
+  higgsfield              Higgsfield AI — image & video generation, Soul character refs,
+                          Marketing Studio, product photoshoots, marketplace cards. NOT a
+                          printing-press CLI — pass --json (not --agent) for raw output, and
+                          use 'higgsfield auth token' (not 'doctor') to check auth.
 
 Before running a CLI you don't already have its recipes loaded for in
 this turn, run:
@@ -51,9 +56,11 @@ Each recipes doc contains scenario-labeled commands; match the request
 to a recipe label and run that command. If no recipe fits, run
 '<cli> --help' to discover commands directly.
 
-Always pass --agent on commands for compact JSON output. Run '<cli>
-doctor' first if you suspect auth, scope, or local-store issues. \`jq\`
-and \`python3\` are available for JSON post-processing. The local SQLite
+Always pass --agent on commands for compact JSON output (printing-press
+CLIs only — higgsfield uses --json instead). Run '<cli> doctor' first
+if you suspect auth, scope, or local-store issues on a printing-press
+CLI; for higgsfield, run 'higgsfield auth token' instead. \`jq\` and
+\`python3\` are available for JSON post-processing. The local SQLite
 store is at $PRESS_DATA_DIR — use 'sync' to populate it and
 'search'/'sql' to query without hitting the live API.
 
@@ -109,8 +116,18 @@ async function probeScreamingFrog(): Promise<unknown> {
   });
 }
 
+function higgsfieldCredentialsPath(): string {
+  const xdg = process.env.XDG_CONFIG_HOME;
+  if (xdg) return path.join(xdg, "higgsfield", "credentials.json");
+  // The CLI uses an XDG-style ~/.config path on every platform (including
+  // macOS — `os.UserConfigDir()` semantics do NOT apply here). Verified
+  // against higgsfield@0.1.40 on darwin.
+  return path.join(process.env.HOME ?? "", ".config", "higgsfield", "credentials.json");
+}
+
 app.get("/health", async (c) => {
   const claudeBinary = await whichClaude();
+  const hfCredsPath = higgsfieldCredentialsPath();
   return c.json({
     ok: true,
     model: MODEL,
@@ -127,6 +144,8 @@ app.get("/health", async (c) => {
     hasContentfulPreviewToken: Boolean(process.env.CONTENTFUL_PREVIEW_TOKEN),
     hasGa4Credentials: Boolean(process.env.GOOGLE_APPLICATION_CREDENTIALS),
     hasGa4PropertyId: Boolean(process.env.GA_PROPERTY_ID),
+    hasHiggsfieldCredentials: existsSync(hfCredsPath),
+    higgsfieldCredentialsPath: hfCredsPath,
     hasScreamingFrog: await probeScreamingFrog(),
   });
 });

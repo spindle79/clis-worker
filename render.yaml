@@ -42,6 +42,12 @@ services:
         value: /etc/secrets/ga4-sa.json
       - key: GA_PROPERTY_ID
         sync: false
+      # higgsfield CLI — device-login only, no API key auth. Upload the
+      # ~/.config/higgsfield/credentials.json produced by `higgsfield auth
+      # login` on your laptop as a Render Secret File named
+      # `higgsfield-credentials.json` (Environment → Secret Files); the
+      # container entrypoint copies it onto /data on first boot so the CLI
+      # can rewrite the refreshed token on the persistent disk.
       - key: WORKER_API_KEY
         generateValue: true
       - key: NODE_ENV
